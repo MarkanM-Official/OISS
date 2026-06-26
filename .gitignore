@@ -1,0 +1,28 @@
+# Python / Server
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+server/venv/
+server/.venv/
+.pytest_cache/
+
+# Flutter / App
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.packages
+app/build/
+app/ios/.symlinks/
+app/ios/Pods/
+app/macos/Pods/
+app/android/app/src/main/res/values/strings.xml
+app/android/key.properties
+*.jks
+*.keystore
+
+# Web / OS
+.DS_Store
+Thumbs.db
+dist/
+node_modules/
