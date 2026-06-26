@@ -69,9 +69,9 @@ async def send_routed_message(target_session_id: str, message: dict):
             await target_ws.send_text(json.dumps(message))
 
 # --- WEB ADMIN ROUTES ---
-@app.get("/", response_class=RedirectResponse)
-async def root():
-    return RedirectResponse(url='/admin')
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    return templates.TemplateResponse(request=request, name="index.html")
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_login(request: Request):
