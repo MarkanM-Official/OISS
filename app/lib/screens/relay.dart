@@ -29,6 +29,36 @@ class _RelayScreenState extends State<RelayScreen> {
     await socketService.connect("ws://10.180.191.113:8000/ws");
     
     if (socketService.isConnected) {
+      socketService.onError = (err) {
+        setState(() {
+          _status = "Error: $err";
+        });
+      };
+      
+      socketService.onAdminNotification = (message) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.campaign, color: Colors.blue),
+                  SizedBox(width: 10),
+                  Text("Admin Broadcast"),
+                ],
+              ),
+              content: Text(message),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("OK"),
+                )
+              ],
+            ),
+          );
+        }
+      };
+
       socketService.registerAsRelay();
       setState(() {
         _status = "Relay Node Active. Forwarding traffic securely...";

@@ -15,6 +15,7 @@ class SocketService extends ChangeNotifier {
   Function(String filename, String base64Data)? onFileReceived;
   Function(String error)? onError;
   Function()? onWaitingApproval;
+  Function(String message)? onAdminNotification;
   
   bool get isConnected => _isConnected;
 
@@ -80,6 +81,9 @@ class SocketService extends ChangeNotifier {
           'target_id': msg['target_id'],
           'payload': msg['payload']
         });
+        break;
+      case 'admin_notification':
+        onAdminNotification?.call(msg['message'] ?? 'Admin Notification');
         break;
     }
   }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'donor.dart';
+import 'donor_setup.dart';
 
 class DonorSettingsScreen extends StatefulWidget {
   const DonorSettingsScreen({Key? key}) : super(key: key);
@@ -141,7 +141,7 @@ class _DonorSettingsScreenState extends State<DonorSettingsScreen> {
               if (mounted) {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => const DonorScreen()),
+                  MaterialPageRoute(builder: (context) => const DonorSetupScreen()),
                 );
               }
             },

@@ -84,6 +84,30 @@ class _DonorScreenState extends State<DonorScreen> {
       }
     };
 
+    socketService.onAdminNotification = (message) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.campaign, color: Colors.blue),
+                SizedBox(width: 10),
+                Text("Admin Broadcast"),
+              ],
+            ),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              )
+            ],
+          ),
+        );
+      }
+    };
+
     socketService.onConnected = (_) {
       setState(() {
         _status = "Connected! Sharing active.";

@@ -91,8 +91,8 @@ jobs:
           name: oiss-linux-deb
           path: app/build/linux/x64/release/bundle/
 
-  build_web:
-    runs-on: ubuntu-latest
+  build_macos:
+    runs-on: macos-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -106,17 +106,17 @@ jobs:
       - name: Install Dependencies
         run: cd app && flutter pub get
 
-      - name: Build Web
-        run: cd app && flutter build web --release
+      - name: Build MacOS
+        run: cd app && flutter build macos --release
 
-      - name: Upload Web Artifact
+      - name: Upload MacOS Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: oiss-web
-          path: app/build/web/
+          name: oiss-macos-app
+          path: app/build/macos/Build/Products/Release/
 
   release:
-    needs: [build_android, build_windows, build_linux, build_web]
+    needs: [build_android, build_windows, build_linux, build_macos]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -141,6 +141,12 @@ jobs:
           name: oiss-linux-deb
           path: artifacts/linux
           
+      - name: Download MacOS
+        uses: actions/download-artifact@v4
+        with:
+          name: oiss-macos-app
+          path: artifacts/macos
+          
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -148,5 +154,6 @@ jobs:
             artifacts/android/app-release.apk
             artifacts/windows/*
             artifacts/linux/*
+            artifacts/macos/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

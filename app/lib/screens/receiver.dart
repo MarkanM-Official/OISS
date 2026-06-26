@@ -43,6 +43,40 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
       });
     };
 
+    socketService.onFileReceived = (filename, base64Data) {
+      if (mounted) {
+        setState(() {
+          _status = "Received file: $filename";
+        });
+      }
+    };
+    
+    socketService.onAdminNotification = (message) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.campaign, color: Colors.blue),
+                SizedBox(width: 10),
+                Text("Admin Broadcast"),
+              ],
+            ),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              )
+            ],
+          ),
+        );
+      }
+    };
+
+
+
     socketService.onRejected = () {
       setState(() {
         _status = "Connection rejected by donor.";

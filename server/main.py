@@ -1,8 +1,14 @@
 import json
 import asyncio
 import time
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+import os
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Form, Depends
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
+from authlib.integrations.starlette_client import OAuth
+from starlette.middleware.sessions import SessionMiddleware
+
 from privacy import privacy_manager, logger
 from relay_manager import relay_manager
 import database
@@ -12,6 +18,26 @@ database.init_db()
 
 app = FastAPI(title="OISS Backend Server")
 
+# Secure session middleware for Authlib
+app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "super-secret-oiss-key"))
+
+# Jinja2 Templates
+templates = Jinja2Templates(directory="templates")
+
+# Google OAuth Setup
+oauth = OAuth()
+oauth.register(
+    name='google',
+    client_id=os.getenv('GOOGLE_CLIENT_ID', ''),
+    client_secret=os.getenv('GOOGLE_CLIENT_SECRET', ''),
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={
+        'scope': 'openid email profile'
+    }
+)
+
+ADMIN_EMAILS = ["markanm.official@gmail.com"]
+
 connections = {}           # session_uuid -> WebSocket object
 donors_by_code = {}        # code -> donor_session_uuid
 receiver_state = {}        # receiver_session_uuid -> {"donor_uuid": uuid, "status": "pending" | "connected"}
@@ -19,9 +45,7 @@ donor_to_receivers = {}    # donor_session_uuid -> set of receiver_session_uuids
 session_start_times = {}   
 
 MAX_SESSION_DURATION = 4 * 3600
-
-# Gamification Trackers (In-memory cache for data usage before writing to DB)
-donor_limits = {} # donor_session_uuid -> {"max_users": int, "data_limit_mb": float, "used_mb": float, "time_limit_minutes": int, "is_public": bool}
+donor_limits = {} 
 
 async def send_routed_message(target_session_id: str, message: dict):
     relay_id = relay_manager.get_relay_for_session(target_session_id)
@@ -38,6 +62,79 @@ async def send_routed_message(target_session_id: str, message: dict):
         if target_ws:
             await target_ws.send_text(json.dumps(message))
 
+# --- WEB ADMIN ROUTES ---
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_login(request: Request):
+    user = request.session.get('user')
+    if user:
+        return RedirectResponse(url='/admin/dashboard')
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.get("/admin/auth/login")
+async def login(request: Request):
+    if not os.getenv('GOOGLE_CLIENT_ID'):
+        # Fallback for testing if Google OAuth is not configured
+        request.session['user'] = {'email': 'markanm.official@gmail.com', 'name': 'OISS Admin'}
+        return RedirectResponse(url='/admin/dashboard')
+        
+    redirect_uri = request.url_for('auth')
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+@app.get("/admin/auth")
+async def auth(request: Request):
+    token = await oauth.google.authorize_access_token(request)
+    user = token.get('userinfo')
+    if user:
+        request.session['user'] = user
+    return RedirectResponse(url='/admin/dashboard')
+
+@app.get("/admin/logout")
+async def logout(request: Request):
+    request.session.pop('user', None)
+    return RedirectResponse(url='/admin')
+
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+async def admin_dashboard(request: Request):
+    user = request.session.get('user')
+    if not user:
+        return RedirectResponse(url='/admin')
+        
+    if user['email'] not in ADMIN_EMAILS:
+        return HTMLResponse("<h1>Access Denied</h1><p>You are not an authorized OISS Administrator.</p>", status_code=403)
+        
+    # Get stats for dashboard
+    active_connections = len(connections)
+    total_public_servers = len(database.get_public_servers())
+    leaderboard = database.get_leaderboard()
+    
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request, 
+        "user": user,
+        "active_connections": active_connections,
+        "total_servers": total_public_servers,
+        "leaderboard": leaderboard
+    })
+
+@app.post("/admin/broadcast")
+async def broadcast_notification(request: Request, message: str = Form(...)):
+    user = request.session.get('user')
+    if not user or user['email'] not in ADMIN_EMAILS:
+        return RedirectResponse(url='/admin')
+        
+    # Send broadcast to all connected websockets
+    broadcast_msg = {
+        "type": "admin_notification",
+        "message": message
+    }
+    
+    for session_id, ws in connections.items():
+        try:
+            asyncio.create_task(ws.send_text(json.dumps(broadcast_msg)))
+        except:
+            pass
+            
+    return RedirectResponse(url='/admin/dashboard?msg=Broadcast+Sent')
+
 # --- REST APIs ---
 @app.get("/api/servers")
 def get_public_servers():
@@ -52,13 +149,11 @@ def get_leaderboard():
 async def websocket_endpoint(websocket: WebSocket):
     client_host = websocket.client.host if websocket.client else "unknown"
     
-    # 1. Blocklist Check
     if database.is_blocked(client_host):
         await websocket.accept()
-        await websocket.close(code=1008, reason="Your device/IP is blocked from the OISS network.")
+        await websocket.close(code=1008, reason="Your device/IP is blocked.")
         return
 
-    # 2. Rate Limit Check
     if not privacy_manager.check_connection_rate_limit(client_host):
         await websocket.accept()
         await websocket.close(code=1008, reason="Rate limit exceeded")
@@ -68,18 +163,15 @@ async def websocket_endpoint(websocket: WebSocket):
     session_id = privacy_manager.mask_client(client_host)
     del client_host  
     
-    # Blocklist check by masked session id as well
     if database.is_blocked(session_id):
-        await websocket.close(code=1008, reason="Your device/IP is blocked from the OISS network.")
+        await websocket.close(code=1008, reason="Your device/IP is blocked.")
         return
 
     connections[session_id] = websocket
     session_start_times[session_id] = time.time()
-    logger.info(f"sess_{session_id} | client_connected")
     
     try:
         while True:
-            # Check Master Time Limit
             if time.time() - session_start_times.get(session_id, 0) > MAX_SESSION_DURATION:
                 await websocket.close(code=1008, reason="Session max duration reached")
                 break
@@ -113,7 +205,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 time_limit = msg.get("time_limit_minutes", 0)
                 data_limit = msg.get("data_limit_mb", 0.0)
 
-                # Store session details
                 donors_by_code[code] = session_id
                 donor_to_receivers[session_id] = set()
                 donor_limits[session_id] = {
@@ -124,7 +215,6 @@ async def websocket_endpoint(websocket: WebSocket):
                     "is_public": is_public
                 }
                 
-                # Register in SQLite (For Global Directory & Leaderboard)
                 database.register_server(
                     uid=session_id, 
                     name=name, 
@@ -135,7 +225,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 )
                 
                 relay_manager.assign_relay(session_id)
-                logger.info(f"sess_{session_id} | registered_donor")
                 await websocket.send_text(json.dumps({"type": "registered", "code": code, "uid": session_id}))
                 
             # --- RECEIVER JOIN HANDLER ---
@@ -146,18 +235,15 @@ async def websocket_endpoint(websocket: WebSocket):
                     
                 code = msg.get("code")
                 
-                # Check if it's a pairing code OR a direct UUID (from Public Servers)
                 donor_uuid = donors_by_code.get(code)
                 if not donor_uuid and code in donor_to_receivers:
                     donor_uuid = code
-
                 
                 if not donor_uuid:
                     privacy_manager.record_wrong_code(session_id)
                     await websocket.send_text(json.dumps({"type": "error", "message": "Invalid code"}))
                     continue
                 
-                # Check Donor limits before joining
                 limits = donor_limits.get(donor_uuid)
                 if limits:
                     if len(donor_to_receivers.get(donor_uuid, set())) >= limits["max_users"]:
@@ -178,10 +264,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     if state["donor_uuid"] == session_id:
                         state["status"] = "connected"
                         donor_to_receivers[session_id].add(receiver_id)
-                        
-                        # Update DB connections count
                         database.update_server_stats(session_id, connections_delta=1)
-
                         await send_routed_message(session_id, {"type": "connected", "peer": receiver_id})
                         await send_routed_message(receiver_id, {"type": "connected"})
                             
@@ -192,42 +275,26 @@ async def websocket_endpoint(websocket: WebSocket):
                         await send_routed_message(receiver_id, {"type": "rejected"})
                         del receiver_state[receiver_id]
                         
-            # --- UPVOTE / DOWNVOTE ---
-            elif msg_type == "vote":
-                donor_uuid = msg.get("donor_uuid")
-                vote_type = msg.get("vote_type")
-                if donor_uuid:
-                    if vote_type == "up":
-                        database.update_server_stats(donor_uuid, upvote=True)
-                    elif vote_type == "down":
-                        database.update_server_stats(donor_uuid, downvote=True)
-
             # --- DATA TRANSFER HANDLER ---
             elif msg_type == "data" or msg_type == "file_transfer":
                 payload = msg.get("payload", "")
                 filename = msg.get("filename") 
                 
-                # Calculate bytes (approximate payload length in bytes)
                 data_bytes = len(payload)
                 mb_size = data_bytes / (1024 * 1024)
                 
-                # Find the donor session associated with this transfer
                 donor_uuid = None
                 if session_id in donor_to_receivers:
                     donor_uuid = session_id
                 elif session_id in receiver_state:
                     donor_uuid = receiver_state[session_id]["donor_uuid"]
                 
-                # Check data limits
                 if donor_uuid and donor_uuid in donor_limits:
                     limits = donor_limits[donor_uuid]
                     limits["used_mb"] += mb_size
-                    
-                    # Update SQLite Total Data Shared asynchronously
                     database.update_server_stats(donor_uuid, data_transferred_bytes=data_bytes)
                     
                     if limits["data_limit_mb"] > 0 and limits["used_mb"] >= limits["data_limit_mb"]:
-                        # Limit exceeded! Disconnect everyone.
                         await send_routed_message(donor_uuid, {"type": "error", "message": "Data limit reached."})
                         for r_id in list(donor_to_receivers[donor_uuid]):
                             await send_routed_message(r_id, {"type": "error", "message": "Host data limit reached."})
@@ -238,7 +305,6 @@ async def websocket_endpoint(websocket: WebSocket):
                             await connections[donor_uuid].close(code=1008, reason="Data limit reached")
                         continue
 
-                # Forward message
                 msg_to_send = {"type": msg_type, "payload": payload}
                 if filename:
                     msg_to_send["filename"] = filename
@@ -256,8 +322,6 @@ async def websocket_endpoint(websocket: WebSocket):
         pass
         
     finally:
-        logger.info(f"sess_{session_id} | client_disconnected")
-        
         privacy_manager.clean_session(session_id)
         relay_manager.remove_relay(session_id)
         
@@ -267,10 +331,8 @@ async def websocket_endpoint(websocket: WebSocket):
         if session_id in connections:
             del connections[session_id]
             
-        # If donor disconnected
         if session_id in donor_to_receivers:
-            database.register_server(session_id, name="", is_public=False) # Simplistic way to deactivate, better is updating is_active
-            
+            database.register_server(session_id, name="", is_public=False)
             receivers = donor_to_receivers[session_id]
             for r_id in list(receivers):
                 asyncio.create_task(send_routed_message(r_id, {"type": "donor_disconnected"}))
@@ -282,7 +344,6 @@ async def websocket_endpoint(websocket: WebSocket):
             if session_id in donor_limits:
                 del donor_limits[session_id]
             
-        # If receiver disconnected
         if session_id in receiver_state:
             donor_uuid = receiver_state[session_id]["donor_uuid"]
             if donor_uuid in donor_to_receivers and session_id in donor_to_receivers[donor_uuid]:
