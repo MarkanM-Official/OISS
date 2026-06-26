@@ -4,13 +4,24 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/socket_service.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class DonorScreen extends StatefulWidget {
-  const DonorScreen({Key? key}) : super(key: key);
+  final bool isPublic;
+  final String serverName;
+  final int maxUsers;
+  final double dataLimitMB;
+
+  const DonorScreen({
+    Key? key,
+    required this.isPublic,
+    required this.serverName,
+    required this.maxUsers,
+    required this.dataLimitMB,
+  }) : super(key: key);
 
   @override
   State<DonorScreen> createState() => _DonorScreenState();
@@ -22,7 +33,6 @@ class _DonorScreenState extends State<DonorScreen> {
   bool _isConnectedToPeer = false;
   
   int _connectedUsers = 0;
-  double _maxUsers = 1;
   int _secondsActive = 0;
   Timer? _timer;
 
@@ -32,23 +42,14 @@ class _DonorScreenState extends State<DonorScreen> {
     _pairingCode = const Uuid().v4().substring(0, 6).toUpperCase();
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadSettingsAndConnect();
+      _setupSocket();
     });
   }
 
   void _shareCode() {
     Share.share(
-      'Use my internet on OISS! My connection code is: $_pairingCode\n\nDownload OISS App: https://github.com/GCIS-Project/OISS',
+      'Use my internet on OISS! My connection code is: $_pairingCode\n\nDownload OISS App: https://github.com/MarkanM-Official/OISS',
     );
-  }
-
-  Future<void> _loadSettingsAndConnect() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _maxUsers = prefs.getDouble('maxUsers') ?? 1;
-    });
-    
-    _setupSocket();
   }
 
   void _setupSocket() async {
@@ -57,18 +58,29 @@ class _DonorScreenState extends State<DonorScreen> {
     await socketService.connect("ws://10.180.191.113:8000/ws");
     
     if (socketService.isConnected) {
-      socketService.registerAsDonor(_pairingCode);
+      // Pass all the config to socket service
+      socketService.registerAsDonorConfigured(
+        _pairingCode,
+        widget.isPublic,
+        widget.serverName,
+        widget.maxUsers,
+        widget.dataLimitMB,
+      );
       setState(() {
-        _status = "Waiting for someone to connect...";
+        _status = widget.isPublic ? "Public Server Active. Waiting for peers..." : "Waiting for someone to connect...";
       });
     }
 
     socketService.onApprovalRequest = (receiverId) {
-      if (_connectedUsers >= _maxUsers) {
-        // Automatically reject if max users reached
+      if (_connectedUsers >= widget.maxUsers) {
         socketService.rejectReceiver(receiverId);
       } else {
-        _showApprovalDialog(receiverId);
+        if (widget.isPublic) {
+          // Public servers auto-approve connections
+          socketService.approveReceiver(receiverId);
+        } else {
+          _showApprovalDialog(receiverId);
+        }
       }
     };
 
@@ -146,15 +158,16 @@ class _DonorScreenState extends State<DonorScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Donate Internet'),
-        backgroundColor: Colors.green,
+        title: Text(widget.serverName),
+        backgroundColor: widget.isPublic ? Colors.purple : Colors.green,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: _shareCode,
-            tooltip: 'Share Code',
-          ),
+          if (!widget.isPublic)
+            IconButton(
+              icon: const Icon(Icons.share),
+              onPressed: _shareCode,
+              tooltip: 'Share Code',
+            ),
         ],
       ),
       body: Center(
@@ -163,13 +176,21 @@ class _DonorScreenState extends State<DonorScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (!_isConnectedToPeer) ...[
+              if (!widget.isPublic && !_isConnectedToPeer) ...[
                 const Text(
-                  'Your Pairing Code',
+                  'Scan QR Code to Connect',
                   style: TextStyle(fontSize: 18, color: Colors.grey),
                 ),
                 const SizedBox(height: 16),
+                QrImageView(
+                  data: _pairingCode,
+                  version: QrVersions.auto,
+                  size: 200.0,
+                ),
+                const SizedBox(height: 16),
+                const Text('OR USE TEXT CODE', style: TextStyle(fontWeight: FontWeight.bold)),
                 Container(
+                  margin: const EdgeInsets.only(top: 10),
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
                   decoration: BoxDecoration(
                     color: Colors.grey[200],
@@ -185,6 +206,11 @@ class _DonorScreenState extends State<DonorScreen> {
                   ),
                 ),
                 const SizedBox(height: 40),
+              ] else if (widget.isPublic && !_isConnectedToPeer) ...[
+                 const Icon(Icons.public, size: 80, color: Colors.purple),
+                 const SizedBox(height: 20),
+                 const Text("Your server is listed publicly.\nWaiting for automatic connections...", textAlign: TextAlign.center, style: TextStyle(fontSize: 18)),
+                 const SizedBox(height: 40),
               ] else ...[
                 // Active Dashboard Cards
                 Card(
@@ -193,17 +219,17 @@ class _DonorScreenState extends State<DonorScreen> {
                   child: ListTile(
                     leading: const Icon(Icons.people, color: Colors.blue, size: 40),
                     title: const Text("Users Connected", style: TextStyle(color: Colors.grey)),
-                    subtitle: Text("$_connectedUsers / ${_maxUsers.round()}", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                    subtitle: Text("$_connectedUsers / ${widget.maxUsers}", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(height: 16),
                 Card(
                   elevation: 4,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: const ListTile(
-                    leading: Icon(Icons.data_usage, color: Colors.orange, size: 40),
-                    title: Text("Data Used", style: TextStyle(color: Colors.grey)),
-                    subtitle: Text("0.0 MB", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  child: ListTile(
+                    leading: const Icon(Icons.data_usage, color: Colors.orange, size: 40),
+                    title: const Text("Data Limit", style: TextStyle(color: Colors.grey)),
+                    subtitle: Text(widget.dataLimitMB == 0 ? "Unlimited" : "${widget.dataLimitMB.round()} MB", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -231,44 +257,13 @@ class _DonorScreenState extends State<DonorScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () async {
-                    FilePickerResult? result = await FilePicker.pickFiles();
-                    if (result != null) {
-                      File file = File(result.files.single.path!);
-                      final bytes = await file.readAsBytes();
-                      final base64String = base64Encode(bytes);
-                      final socketService = Provider.of<SocketService>(context, listen: false);
-                      socketService.sendFile(result.files.single.name, base64String);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Sent ${result.files.single.name} to all receivers')),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.attach_file),
-                  label: const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Text('Share File', style: TextStyle(fontSize: 18)),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
                   onPressed: () {
                     Navigator.pop(context);
                   },
                   icon: const Icon(Icons.stop_circle),
                   label: const Padding(
                     padding: EdgeInsets.all(16.0),
-                    child: Text('Stop Sharing', style: TextStyle(fontSize: 18)),
+                    child: Text('Stop Server', style: TextStyle(fontSize: 18)),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,

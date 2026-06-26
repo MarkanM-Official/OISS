@@ -88,6 +88,17 @@ class SocketService extends ChangeNotifier {
     _send({'type': 'register_donor', 'code': code});
   }
 
+  void registerAsDonorConfigured(String code, bool isPublic, String name, int maxUsers, double dataLimitMB) {
+    _send({
+      'type': 'register_donor',
+      'code': code,
+      'is_public': isPublic,
+      'name': name,
+      'max_users': maxUsers,
+      'data_limit_mb': dataLimitMB
+    });
+  }
+
   void joinAsReceiver(String code) {
     _send({'type': 'join', 'code': code});
   }

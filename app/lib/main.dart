@@ -20,7 +20,7 @@ class OissApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'GCIS - Open Internet Sharing',
+      title: 'OISS - Open Internet Sharing System',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         useMaterial3: true,

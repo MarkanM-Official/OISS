@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'donor.dart';
+import 'donor_setup.dart';
 import 'donor_settings.dart';
 import 'receiver.dart';
 import 'relay.dart';
+import 'public_servers.dart';
 import 'plugins.dart';
 
 import 'package:share_plus/share_plus.dart';
@@ -20,7 +21,7 @@ class HomeScreen extends StatelessWidget {
             icon: const Icon(Icons.share),
             onPressed: () {
               Share.share(
-                'Internet share karna ab aur bhi aasan aur secure hai! Download the OISS App (Open Internet Sharing System) now and join the community: https://github.com/GCIS-Project/OISS',
+                'Internet share karna ab aur bhi aasan aur secure hai! Download the OISS App (Open Internet Sharing System) now and join the community: https://github.com/MarkanM-Official/OISS',
               );
             },
             tooltip: 'Share App',
@@ -35,7 +36,7 @@ class HomeScreen extends StatelessWidget {
             children: [
               const SizedBox(height: 40),
               const Text(
-                'GCIS',
+                'OISS',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 48,
@@ -57,7 +58,7 @@ class HomeScreen extends StatelessWidget {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const DonorSettingsScreen()),
+                    MaterialPageRoute(builder: (context) => const DonorSetupScreen()),
                   );
                 },
                 icon: const Icon(Icons.wifi_tethering, size: 32),
@@ -88,6 +89,27 @@ class HomeScreen extends StatelessWidget {
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2196F3),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const PublicServersScreen()),
+                  );
+                },
+                icon: const Icon(Icons.public, size: 32),
+                label: const Padding(
+                  padding: EdgeInsets.all(20.0),
+                  child: Text('Public Server List', style: TextStyle(fontSize: 20)),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
