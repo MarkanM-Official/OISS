@@ -78,7 +78,7 @@ async def admin_login(request: Request):
     user = request.session.get('user')
     if user:
         return RedirectResponse(url='/admin/dashboard')
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="login.html")
 
 @app.get("/admin/auth/login")
 async def login(request: Request):
@@ -117,13 +117,16 @@ async def admin_dashboard(request: Request):
     total_public_servers = len(database.get_public_servers())
     leaderboard = database.get_leaderboard()
     
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request, 
-        "user": user,
-        "active_connections": active_connections,
-        "total_servers": total_public_servers,
-        "leaderboard": leaderboard
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context={
+            "user": user,
+            "active_connections": active_connections,
+            "total_servers": total_public_servers,
+            "leaderboard": leaderboard
+        }
+    )
 
 @app.post("/admin/broadcast")
 async def broadcast_notification(request: Request, message: str = Form(...)):
