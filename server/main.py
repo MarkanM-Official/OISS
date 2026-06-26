@@ -2,6 +2,7 @@ import json
 import asyncio
 import time
 import os
+import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Form, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -12,6 +13,10 @@ from starlette.middleware.sessions import SessionMiddleware
 from privacy import privacy_manager, logger
 from relay_manager import relay_manager
 import database
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 
 # Initialize SQLite database
 database.init_db()
@@ -136,6 +141,51 @@ async def broadcast_notification(request: Request, message: str = Form(...)):
     return RedirectResponse(url='/admin/dashboard?msg=Broadcast+Sent')
 
 # --- REST APIs ---
+class TokenVerifyRequest(BaseModel):
+    id_token: str
+    mac_address: str = ""
+    device_name: str = ""
+
+@app.post("/api/auth/verify_token")
+async def verify_flutter_token(req: TokenVerifyRequest, request: Request):
+    try:
+        # Verify the token with Google
+        client_id = os.getenv("GOOGLE_CLIENT_ID")
+        if not client_id:
+            return {"status": "success", "message": "Login successful (verification disabled on server)"}
+            
+        idinfo = id_token.verify_oauth2_token(req.id_token, google_requests.Request(), client_id)
+        email = idinfo.get("email", "")
+        name = idinfo.get("name", "")
+        
+        # Log to Google Sheets
+        sheet_json = os.getenv("GOOGLE_SHEET_JSON")
+        sheet_id = os.getenv("GOOGLE_SHEET_ID")
+        if sheet_json and sheet_id:
+            try:
+                creds_dict = json.loads(sheet_json)
+                creds = Credentials.from_service_account_info(creds_dict, scopes=['https://www.googleapis.com/auth/spreadsheets'])
+                service = build('sheets', 'v4', credentials=creds)
+                
+                client_ip = request.client.host if request.client else "unknown"
+                now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                values = [[now_str, name, email, client_ip, req.mac_address, req.device_name]]
+                body = {'values': values}
+                
+                service.spreadsheets().values().append(
+                    spreadsheetId=sheet_id,
+                    range="Sheet1!A:F",
+                    valueInputOption="USER_ENTERED",
+                    body=body
+                ).execute()
+            except Exception as e:
+                logger.error(f"Failed to log to Google Sheets: {e}")
+                
+        return {"status": "success", "email": email, "name": name}
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
 @app.get("/api/servers")
 def get_public_servers():
     return database.get_public_servers()
