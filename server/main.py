@@ -87,7 +87,7 @@ async def login(request: Request):
         request.session['user'] = {'email': 'markanm.official@gmail.com', 'name': 'OISS Admin'}
         return RedirectResponse(url='/admin/dashboard')
         
-    redirect_uri = request.url_for('auth')
+    redirect_uri = str(request.url_for('auth')).replace("http://", "https://")
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 @app.get("/admin/auth")
@@ -155,7 +155,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key-for-app-tokens")
 
 @app.get("/app/login")
 async def app_login(request: Request):
-    redirect_uri = request.url_for('app_auth')
+    redirect_uri = str(request.url_for('app_auth')).replace("http://", "https://")
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 @app.get("/app/auth")
