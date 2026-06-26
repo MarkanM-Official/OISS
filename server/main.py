@@ -27,7 +27,8 @@ app = FastAPI(title="OISS Backend Server")
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "super-secret-oiss-key"))
 
 # Jinja2 Templates
-templates = Jinja2Templates(directory="templates")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 # Google OAuth Setup
 oauth = OAuth()
