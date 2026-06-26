@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../main.dart'; // To navigate to home screen
+import 'home.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -17,40 +18,29 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email'],
-  );
+  final TextEditingController _tokenController = TextEditingController();
   
   // Replace this with your actual Render backend URL
   final String _backendUrl = "https://oiss.onrender.com"; 
 
-  Future<void> _handleSignIn() async {
+  Future<void> _openWebLogin() async {
+    final Uri url = Uri.parse('$_backendUrl/app/login');
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      _showError("Could not launch browser. Please open $_backendUrl/app/login manually.");
+    }
+  }
+
+  Future<void> _verifyTokenWithBackend() async {
+    final String idToken = _tokenController.text.trim();
+    if (idToken.isEmpty) {
+      _showError("Please paste the token first.");
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
-    try {
-      final GoogleSignInAccount? account = await _googleSignIn.signIn();
-      if (account != null) {
-        final GoogleSignInAuthentication auth = await account.authentication;
-        final String? idToken = auth.idToken;
-        
-        if (idToken != null) {
-          await _verifyTokenWithBackend(idToken);
-        } else {
-          _showError("Failed to retrieve Google ID Token.");
-        }
-      }
-    } catch (error) {
-      _showError("Sign-in failed: $error");
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _verifyTokenWithBackend(String idToken) async {
     try {
       final deviceInfo = DeviceInfoPlugin();
       String deviceName = "Unknown Device";
@@ -95,6 +85,10 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       _showError("Network Error: $e");
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -135,31 +129,60 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 10),
               const Text(
-                "Sign in to securely access the network.",
+                "Sign in securely to access the network.",
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey, fontSize: 14),
               ),
               const SizedBox(height: 40),
+              
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                icon: Image.network(
+                  'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg',
+                  height: 24,
+                ),
+                label: const Text(
+                  "Get Login Token via Web",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                onPressed: _openWebLogin,
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _tokenController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: "Paste your Token here",
+                  hintStyle: const TextStyle(color: Colors.grey),
+                  filled: true,
+                  fillColor: Colors.black54,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
               _isLoading
                   ? const CircularProgressIndicator(color: Colors.blue)
-                  : ElevatedButton.icon(
+                  : ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                        backgroundColor: Colors.blueAccent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      icon: Image.network(
-                        'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg',
-                        height: 24,
-                      ),
-                      label: const Text(
-                        "Sign In with Google",
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: _handleSignIn,
+                      onPressed: _verifyTokenWithBackend,
+                      child: const Text("Verify Token", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
             ],
           ),

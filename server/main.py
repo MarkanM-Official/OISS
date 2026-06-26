@@ -140,7 +140,66 @@ async def broadcast_notification(request: Request, message: str = Form(...)):
             
     return RedirectResponse(url='/admin/dashboard?msg=Broadcast+Sent')
 
-# --- REST APIs ---
+# --- App Token Flow (For Desktop/All Platforms) ---
+import jwt
+
+SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key-for-app-tokens")
+
+@app.get("/app/login")
+async def app_login(request: Request):
+    redirect_uri = request.url_for('app_auth')
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+@app.get("/app/auth")
+async def app_auth(request: Request):
+    try:
+        token = await oauth.google.authorize_access_token(request)
+        user = token.get('userinfo')
+        if not user:
+            user = await oauth.google.parse_id_token(request, token)
+            
+        # Create a simple JWT token for the app
+        app_token = jwt.encode(
+            {"email": user.get("email"), "name": user.get("name"), "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1)},
+            SECRET_KEY,
+            algorithm="HS256"
+        )
+        
+        html_content = f"""
+        <html>
+            <head>
+                <title>OISS App Login</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; background-color: #121212; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
+                    .box {{ background: #1E1E1E; padding: 40px; border-radius: 10px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }}
+                    input {{ padding: 10px; width: 300px; font-size: 16px; margin: 20px 0; text-align: center; border-radius: 5px; border: none; }}
+                    button {{ padding: 10px 20px; font-size: 16px; cursor: pointer; background: #2196F3; color: white; border: none; border-radius: 5px; }}
+                </style>
+            </head>
+            <body>
+                <div class="box">
+                    <h2>Login Successful!</h2>
+                    <p>Please copy the token below and paste it into the OISS App:</p>
+                    <input type="text" id="tokenField" value="{app_token}" readonly>
+                    <br>
+                    <button onclick="copyToken()">Copy Token</button>
+                    <script>
+                        function copyToken() {{
+                            var copyText = document.getElementById("tokenField");
+                            copyText.select();
+                            document.execCommand("copy");
+                            alert("Token copied to clipboard! Now return to the OISS app.");
+                        }}
+                    </script>
+                </div>
+            </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+    except Exception as e:
+        logger.error(f"App auth error: {e}")
+        return HTMLResponse("<h1>Authentication Failed</h1>")
+
 class TokenVerifyRequest(BaseModel):
     id_token: str
     mac_address: str = ""
@@ -149,14 +208,10 @@ class TokenVerifyRequest(BaseModel):
 @app.post("/api/auth/verify_token")
 async def verify_flutter_token(req: TokenVerifyRequest, request: Request):
     try:
-        # Verify the token with Google
-        client_id = os.getenv("GOOGLE_CLIENT_ID")
-        if not client_id:
-            return {"status": "success", "message": "Login successful (verification disabled on server)"}
-            
-        idinfo = id_token.verify_oauth2_token(req.id_token, google_requests.Request(), client_id)
-        email = idinfo.get("email", "")
-        name = idinfo.get("name", "")
+        # Decode the custom JWT token
+        payload = jwt.decode(req.id_token, SECRET_KEY, algorithms=["HS256"])
+        email = payload.get("email", "")
+        name = payload.get("name", "")
         
         # Log to Google Sheets
         sheet_json = os.getenv("GOOGLE_SHEET_JSON")
