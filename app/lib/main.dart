@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/home.dart';
+import 'screens/login.dart';
 import 'services/socket_service.dart';
 
 void main() {
@@ -26,7 +27,7 @@ class OissApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Roboto', // Modern, clean default
       ),
-      home: const HomeScreen(),
+      home: const LoginScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
