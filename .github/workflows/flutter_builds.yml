@@ -12,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -33,7 +33,7 @@ jobs:
         run: cd app && flutter build apk --release
 
       - name: Upload APK Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: oiss-android-apk
           path: app/build/app/outputs/flutter-apk/app-release.apk
@@ -42,7 +42,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -57,34 +57,96 @@ jobs:
         run: cd app && flutter build windows --release
 
       - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: oiss-windows-exe
           path: app/build/windows/x64/runner/Release/
 
+  build_linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+
+      - name: Install Linux Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+
+      - name: Install App Dependencies
+        run: cd app && flutter pub get
+
+      - name: Build Linux
+        run: cd app && flutter build linux --release
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: oiss-linux-deb
+          path: app/build/linux/x64/release/bundle/
+
+  build_web:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+
+      - name: Install Dependencies
+        run: cd app && flutter pub get
+
+      - name: Build Web
+        run: cd app && flutter build web --release
+
+      - name: Upload Web Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: oiss-web
+          path: app/build/web/
+
   release:
-    needs: [build_android, build_windows]
+    needs: [build_android, build_windows, build_linux, build_web]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download APK
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: oiss-android-apk
+          path: artifacts/android
 
       - name: Download Windows
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: oiss-windows-exe
+          path: artifacts/windows
+          
+      - name: Download Linux
+        uses: actions/download-artifact@v4
+        with:
+          name: oiss-linux-deb
+          path: artifacts/linux
           
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            app-release.apk
-            Release/*
+            artifacts/android/app-release.apk
+            artifacts/windows/*
+            artifacts/linux/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
