@@ -4,11 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:package_info_plus/package_info_plus.dart';
-import 'package:open_filex/open_filex.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:io' show Platform, File;
+import 'dart:io' show Platform;
 
 import '../main.dart'; // To navigate to home screen
 import 'home.dart';
@@ -22,7 +18,6 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
-  double _downloadProgress = 0.0;
   final TextEditingController _tokenController = TextEditingController();
   
   // Replace this with your actual Render backend URL
@@ -32,9 +27,6 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _checkSavedToken();
-    if (!kIsWeb && Platform.isAndroid) {
-      _checkForUpdates();
-    }
   }
 
   Future<void> _checkSavedToken() async {
@@ -43,124 +35,6 @@ class _LoginScreenState extends State<LoginScreen> {
     if (token != null && token.isNotEmpty) {
       _tokenController.text = token;
       _verifyTokenWithBackend();
-    }
-  }
-
-  Future<void> _checkForUpdates() async {
-    try {
-      final response = await http.get(Uri.parse('https://api.github.com/repos/MarkanM-Official/OISS/releases/latest'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final latestTag = data['tag_name'] as String; // e.g. "v1.0.123"
-        final latestVersion = latestTag.replaceAll('v', '');
-        
-        final packageInfo = await PackageInfo.fromPlatform();
-        final currentVersion = packageInfo.version; 
-
-        if (_isNewer(latestVersion, currentVersion)) {
-           _showUpdateDialog(latestVersion);
-        }
-      }
-    } catch (e) {
-      debugPrint("Update check failed: $e");
-    }
-  }
-
-  bool _isNewer(String latest, String current) {
-    List<int> l = latest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-    List<int> c = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-    for (int i = 0; i < 3; i++) {
-      int lv = i < l.length ? l[i] : 0;
-      int cv = i < c.length ? c[i] : 0;
-      if (lv > cv) return true;
-      if (lv < cv) return false;
-    }
-    return false;
-  }
-
-  void _showUpdateDialog(String newVersion) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Update Available'),
-        content: Text('OISS version $newVersion is available! Please update to continue.'),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _downloadAndInstallUpdate();
-            },
-            child: const Text('Update Now'),
-          )
-        ],
-      ),
-    );
-  }
-
-  Future<void> _downloadAndInstallUpdate() async {
-    setState(() => _isLoading = true);
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Downloading Update'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  LinearProgressIndicator(value: _downloadProgress > 0 ? _downloadProgress : null),
-                  const SizedBox(height: 10),
-                  Text('${(_downloadProgress * 100).toStringAsFixed(1)}% Completed'),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    try {
-      final url = 'https://github.com/MarkanM-Official/OISS/releases/latest/download/app-release.apk';
-      final client = http.Client();
-      final request = http.Request('GET', Uri.parse(url));
-      final response = await client.send(request);
-      
-      final contentLength = response.contentLength ?? 1;
-      int downloaded = 0;
-      List<int> bytes = [];
-      
-      response.stream.listen(
-        (List<int> newBytes) {
-          bytes.addAll(newBytes);
-          downloaded += newBytes.length;
-          setState(() {
-            _downloadProgress = downloaded / contentLength;
-          });
-          // To update the dialog specifically, but setState on main screen will also rebuild if mounted correctly.
-        },
-        onDone: () async {
-          Navigator.pop(context); // close progress dialog
-          final dir = await getExternalStorageDirectory();
-          final file = File('${dir!.path}/oiss_update.apk');
-          await file.writeAsBytes(bytes);
-          await OpenFilex.open(file.path);
-          setState(() => _isLoading = false);
-        },
-        onError: (e) {
-          Navigator.pop(context);
-          _showError("Error downloading: $e");
-          setState(() => _isLoading = false);
-        },
-        cancelOnError: true,
-      );
-    } catch (e) {
-      Navigator.pop(context);
-      _showError("Error: $e");
-      setState(() => _isLoading = false);
     }
   }
 
