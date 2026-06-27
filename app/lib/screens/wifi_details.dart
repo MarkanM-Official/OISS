@@ -152,6 +152,41 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
           "servers": ["tcp://8.8.8.8", "tcp://8.8.4.4"]
         };
 
+        // Bypass routing for WebSocket and loopback to prevent infinite loop
+        config['routing'] = {
+          "domainStrategy": "IPIfNonMatch",
+          "rules": [
+            {
+              "type": "field",
+              "domain": ["oiss.onrender.com", "onrender.com"],
+              "outboundTag": "direct"
+            },
+            {
+              "type": "field",
+              "ip": ["127.0.0.1/8"],
+              "outboundTag": "direct"
+            },
+            {
+              "type": "field",
+              "network": "tcp,udp",
+              "outboundTag": "proxy"
+            }
+          ]
+        };
+
+        // Ensure outbounds have correct tags
+        if (config['outbounds'] != null) {
+          final outbounds = config['outbounds'] as List;
+          final hasDirect = outbounds.any((o) => o['tag'] == 'direct');
+          if (!hasDirect) {
+            outbounds.add({"protocol": "freedom", "tag": "direct"});
+          }
+          final hasProxy = outbounds.any((o) => o['tag'] == 'proxy');
+          if (!hasProxy && outbounds.isNotEmpty) {
+            outbounds[0]['tag'] = 'proxy';
+          }
+        }
+
         await flutterV2ray.startV2Ray(
           remark: "OISS Network",
           config: jsonEncode(config),
