@@ -229,7 +229,7 @@ class SocketService extends ChangeNotifier {
   Future<void> startLocalProxy() async {
     if (_proxyServer != null) return;
     try {
-      _proxyServer = await ServerSocket.bind(InternetAddress.loopbackIPv4, 1080);
+      _proxyServer = await ServerSocket.bind(InternetAddress.loopbackIPv4, 1081);
       _proxyServer!.listen((Socket clientSocket) {
         int connId = _nextProxyConnId++;
         _proxyConnections[connId] = clientSocket;

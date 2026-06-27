@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_v2ray/flutter_v2ray.dart';
 import '../services/socket_service.dart';
+import 'dart:io' show Platform;
 
 class WifiDetailsScreen extends StatefulWidget {
   final String uid;
@@ -18,12 +20,34 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
   String _status = "Connecting...";
   bool _isConnected = false;
 
+  late FlutterV2ray flutterV2ray;
+
   @override
   void initState() {
     super.initState();
+    flutterV2ray = FlutterV2ray(
+      onStatusChanged: (status) {
+        if (mounted) {
+          if (status.state == "CONNECTED") {
+            setState(() => _status = "VPN Connected! Internet Active.");
+          } else if (status.state == "DISCONNECTED") {
+            if (_isConnected) {
+              setState(() => _status = "VPN Disconnected but Socket Active");
+            }
+          }
+        }
+      },
+    );
+    _initV2Ray();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _connectToOiss();
     });
+  }
+
+  Future<void> _initV2Ray() async {
+    if (Platform.isAndroid) {
+      await flutterV2ray.initializeV2Ray();
+    }
   }
 
   Future<void> _connectToOiss() async {
@@ -51,7 +75,9 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
           _status = "Connected";
         });
         // Start local proxy logic here if needed (from old receiver.dart)
-        socket.startLocalProxy();
+        socket.startLocalProxy().then((_) {
+          _startVpn();
+        });
       }
     };
     
@@ -75,12 +101,39 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
           _isConnected = false;
           _status = "Host Disconnected";
         });
+        if (Platform.isAndroid) flutterV2ray.stopV2Ray();
         socket.stopLocalProxy();
       }
     };
 
     // Join the network
     socket.joinAsReceiver(widget.uid, password: widget.password);
+  }
+
+  Future<void> _startVpn() async {
+    if (!Platform.isAndroid) return;
+    try {
+      if (await flutterV2ray.requestPermission()) {
+        final config = FlutterV2ray.parseFromURL('socks://127.0.0.1:1081').getFullConfiguration();
+        await flutterV2ray.startV2Ray(
+          remark: "OISS Network",
+          config: config,
+          proxyOnly: false,
+        );
+      } else {
+        _showError("VPN Permission Denied. Cannot share internet.");
+      }
+    } catch (e) {
+      print("VPN Start Error: $e");
+    }
+  }
+
+  @override
+  void dispose() {
+    if (Platform.isAndroid) {
+      flutterV2ray.stopV2Ray();
+    }
+    super.dispose();
   }
 
   void _showError(String msg) {

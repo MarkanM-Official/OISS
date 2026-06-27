@@ -48,6 +48,7 @@ dependencies:
   url_launcher: ^6.3.2
   package_info_plus: ^8.0.0
   open_filex: ^4.5.0
+  flutter_v2ray: ^1.0.10
 
 dev_dependencies:
   flutter_test:
