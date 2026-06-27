@@ -254,8 +254,8 @@ class SocketService extends ChangeNotifier {
     }
   }
 
-  Future<void> startLocalProxy() async {
-    if (_proxyServer != null) return;
+  Future<bool> startLocalProxy() async {
+    if (_proxyServer != null) return true;
     try {
       _proxyServer = await ServerSocket.bind(InternetAddress.loopbackIPv4, 1081);
       
@@ -361,8 +361,10 @@ class SocketService extends ChangeNotifier {
           _proxyConnections.remove(connId);
         });
       });
+      return true;
     } catch (e) {
-      print("Proxy Error: $e");
+      onError?.call("Proxy start failed: $e");
+      return false;
     }
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_v2ray/flutter_v2ray.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../services/socket_service.dart';
 import 'dart:io' show Platform;
 import 'package:flutter_background/flutter_background.dart';
@@ -104,9 +105,13 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
           _isConnected = true;
           _status = "Connected";
         });
-        // Start local proxy logic here if needed (from old receiver.dart)
-        socket.startLocalProxy().then((_) {
-          _startVpn();
+        socket.startLocalProxy().then((started) {
+          if (started) {
+            _startVpn();
+          } else if (mounted) {
+            setState(() => _status = "Local proxy failed to start");
+            _showError("Could not start local internet proxy.");
+          }
         });
       }
     };
@@ -144,6 +149,7 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
     if (!Platform.isAndroid) return;
     try {
       if (await flutterV2ray.requestPermission()) {
+        final packageInfo = await PackageInfo.fromPlatform();
         final configString = FlutterV2ray.parseFromURL('socks://127.0.0.1:1081').getFullConfiguration();
         final config = jsonDecode(configString);
         
@@ -190,6 +196,7 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
         await flutterV2ray.startV2Ray(
           remark: "OISS Network",
           config: jsonEncode(config),
+          blockedApps: [packageInfo.packageName],
           proxyOnly: false,
         );
         FlutterBackground.enableBackgroundExecution();

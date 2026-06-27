@@ -54,6 +54,15 @@ MAX_SESSION_DURATION_TEMP = 24 * 3600 # 24 hours for temp connections
 MAX_SESSION_DURATION_PERM = 30 * 24 * 3600 # 30 days for permanent profiles
 donor_limits = {} 
 
+async def _safe_send_text(session_id: str, websocket: WebSocket, message: dict) -> bool:
+    try:
+        await websocket.send_text(json.dumps(message))
+        return True
+    except Exception as exc:
+        logger.info(f"sess_{session_id} | send_failed_{exc.__class__.__name__}")
+        return False
+
+
 async def send_routed_message(target_session_id: str, message: dict):
     relay_id = relay_manager.get_relay_for_session(target_session_id)
     if relay_id and relay_id in connections:
@@ -63,11 +72,12 @@ async def send_routed_message(target_session_id: str, message: dict):
             "target_id": target_session_id,
             "payload": message
         }
-        await relay_ws.send_text(json.dumps(wrapped_msg))
-    else:
-        target_ws = connections.get(target_session_id)
-        if target_ws:
-            await target_ws.send_text(json.dumps(message))
+        if await _safe_send_text(relay_id, relay_ws, wrapped_msg):
+            return
+
+    target_ws = connections.get(target_session_id)
+    if target_ws:
+        await _safe_send_text(target_session_id, target_ws, message)
 
 # --- WEB ADMIN ROUTES ---
 @app.get("/", response_class=HTMLResponse)

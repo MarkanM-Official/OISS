@@ -35,6 +35,11 @@ class OissVpnService : VpnService() {
             builder.addRoute("0.0.0.0", 0) // Route all traffic
             builder.addDnsServer("8.8.8.8")
             builder.setSession("OISS Tunnel")
+            try {
+                builder.addDisallowedApplication(packageName)
+            } catch (_: Exception) {
+                // Keep VPN startup resilient if the package lookup fails.
+            }
             
             vpnInterface = builder.establish()
             
@@ -76,7 +81,7 @@ class OissVpnService : VpnService() {
                 val pb = ProcessBuilder(
                     exeFile.absolutePath,
                     "-device", "fd://$fd",
-                    "-proxy", "socks5://127.0.0.1:1080",
+                    "-proxy", "socks5://127.0.0.1:1081",
                     "-loglevel", "debug"
                 )
                 pb.redirectErrorStream(true)

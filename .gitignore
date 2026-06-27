@@ -6,6 +6,8 @@ __pycache__/
 server/venv/
 server/.venv/
 .pytest_cache/
+server/*.db
+server/*.db-*
 
 # Flutter / App
 app/.dart_tool/
