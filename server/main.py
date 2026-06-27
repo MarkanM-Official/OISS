@@ -422,7 +422,7 @@ async def websocket_endpoint(websocket: WebSocket):
             
             # --- DONOR HANDLER ---
             elif msg_type == "register_donor":
-                code = msg.get("code")
+                code = str(msg.get("code", "")).strip()
                 is_public = msg.get("is_public", False)
                 name = msg.get("name", "Anonymous OISS Node")
                 max_users = msg.get("max_users", 100)
@@ -457,7 +457,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.close(code=1008, reason="Too many wrong attempts")
                     break
                     
-                code = msg.get("code")
+                code = str(msg.get("code", "")).strip()
                 
                 donor_uuid = donors_by_code.get(code)
                 if not donor_uuid and code in donor_to_receivers:
