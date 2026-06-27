@@ -14,6 +14,9 @@ class DonorScreen extends StatefulWidget {
   final String serverName;
   final int maxUsers;
   final double dataLimitMB;
+  final String password;
+  final bool isTemp;
+  final String uid;
 
   const DonorScreen({
     Key? key,
@@ -21,6 +24,9 @@ class DonorScreen extends StatefulWidget {
     required this.serverName,
     required this.maxUsers,
     required this.dataLimitMB,
+    required this.password,
+    required this.isTemp,
+    required this.uid,
   }) : super(key: key);
 
   @override
@@ -39,7 +45,7 @@ class _DonorScreenState extends State<DonorScreen> {
   @override
   void initState() {
     super.initState();
-    _pairingCode = const Uuid().v4().substring(0, 6).toUpperCase();
+    _pairingCode = widget.isTemp ? const Uuid().v4().substring(0, 6).toUpperCase() : widget.uid;
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _setupSocket();
@@ -59,13 +65,15 @@ class _DonorScreenState extends State<DonorScreen> {
     
     if (socketService.isConnected) {
       // Pass all the config to socket service
-      socketService.registerAsDonorConfigured(
-        _pairingCode,
-        widget.isPublic,
-        widget.serverName,
-        widget.maxUsers,
-        widget.dataLimitMB,
-      );
+      socketService.registerAsDonorConfigured({
+        "pairing_code": _pairingCode,
+        "is_public": widget.isPublic,
+        "name": widget.serverName,
+        "max_users": widget.maxUsers,
+        "data_limit_mb": widget.dataLimitMB,
+        "password": widget.password,
+        "is_temp": widget.isTemp,
+      });
       setState(() {
         _status = widget.isPublic ? "Public Server Active. Waiting for peers..." : "Waiting for someone to connect...";
       });

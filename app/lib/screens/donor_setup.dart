@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'donor.dart';
 
 class DonorSetupScreen extends StatefulWidget {
@@ -9,79 +10,112 @@ class DonorSetupScreen extends StatefulWidget {
 }
 
 class _DonorSetupScreenState extends State<DonorSetupScreen> {
-  bool isPublic = false;
-  double dataLimitMB = 0; // 0 means unlimited
-  double maxUsers = 5;
-  TextEditingController nameController = TextEditingController(text: "Anonymous OISS Node");
+  bool _isLoading = true;
+  String _wifiName = "";
+  double _dataLimitMB = 0;
+  double _maxUsers = 5;
+  String _permanentUid = "";
+  String _password = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConfig();
+  }
+
+  Future<void> _loadConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _wifiName = prefs.getString('wifi_name') ?? "My OISS Network";
+      _password = prefs.getString('wifi_password') ?? "";
+      _dataLimitMB = prefs.getDouble('data_limit_mb') ?? 0;
+      _maxUsers = prefs.getDouble('max_users') ?? 5;
+      _permanentUid = prefs.getString('permanent_uid') ?? "";
+      _isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Setup Your Server')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("Server Details", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: "Server Name",
-                border: OutlineInputBorder(),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.wifi_tethering, size: 100, color: Colors.green),
+              const SizedBox(height: 24),
+              Text(
+                _wifiName,
+                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
               ),
-            ),
-            const SizedBox(height: 24),
-            SwitchListTile(
-              title: const Text("Public Server"),
-              subtitle: const Text("List my server in the global directory so anyone can connect."),
-              value: isPublic,
-              onChanged: (val) => setState(() => isPublic = val),
-            ),
-            const SizedBox(height: 24),
-            const Text("Max Allowed Users"),
-            Slider(
-              value: maxUsers,
-              min: 1,
-              max: 100,
-              divisions: 99,
-              label: maxUsers.round().toString(),
-              onChanged: (val) => setState(() => maxUsers = val),
-            ),
-            const SizedBox(height: 24),
-            const Text("Data Limit (MB) - 0 for unlimited"),
-            Slider(
-              value: dataLimitMB,
-              min: 0,
-              max: 5000,
-              divisions: 50,
-              label: dataLimitMB == 0 ? "Unlimited" : "${dataLimitMB.round()} MB",
-              onChanged: (val) => setState(() => dataLimitMB = val),
-            ),
-            const SizedBox(height: 40),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => DonorScreen(
-                        isPublic: isPublic,
-                        serverName: nameController.text,
-                        maxUsers: maxUsers.round(),
-                        dataLimitMB: dataLimitMB,
+              const SizedBox(height: 8),
+              Text(
+                "UID: ${_permanentUid.isEmpty ? 'Not Set' : _permanentUid}",
+                style: const TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Security: ${_password.isEmpty ? 'Open' : 'WPA/WPA2 PSK'}",
+                style: const TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              const SizedBox(height: 48),
+              SizedBox(
+                width: 200,
+                height: 200,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    shape: const CircleBorder(),
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    elevation: 10,
+                  ),
+                  onPressed: () {
+                    if (_permanentUid.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Please setup your profile first in the Profile tab.")),
+                      );
+                      return;
+                    }
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DonorScreen(
+                          isPublic: false,
+                          serverName: _wifiName,
+                          maxUsers: _maxUsers.round(),
+                          dataLimitMB: _dataLimitMB,
+                          password: _password,
+                          isTemp: false,
+                          uid: _permanentUid,
+                        ),
                       ),
-                    ),
-                  );
-                },
-                child: const Text("Start Sharing", style: TextStyle(fontSize: 18)),
+                    );
+                  },
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.power_settings_new, size: 64),
+                      SizedBox(height: 8),
+                      Text("POWER ON", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
               ),
-            )
-          ],
+              const SizedBox(height: 32),
+              const Text(
+                "Tap to start broadcasting your virtual Wi-Fi.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey),
+              )
+            ],
+          ),
         ),
       ),
     );
