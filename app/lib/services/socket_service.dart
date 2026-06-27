@@ -330,8 +330,12 @@ class SocketService extends ChangeNotifier {
     _send(msg);
   }
 
-  void approveReceiver(String receiverId) {
-    _send({'type': 'approve', 'receiver_id': receiverId});
+  void approveReceiver(String receiverId, [Map<String, bool>? permissions]) {
+    _send({
+      'type': 'approve',
+      'receiver_id': receiverId,
+      'permissions': permissions ?? {"internet": true, "files": false, "disk": false}
+    });
   }
 
   void rejectReceiver(String receiverId) {

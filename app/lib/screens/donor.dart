@@ -149,31 +149,66 @@ class _DonorScreenState extends State<DonorScreen> {
   }
 
   void _showApprovalDialog(String receiverId) {
+    bool allowInternet = true;
+    bool allowFiles = false;
+    bool allowDisk = false;
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Connection Request'),
-          content: const Text('Someone wants to use your internet. Allow?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Provider.of<SocketService>(context, listen: false).rejectReceiver(receiverId);
-                Navigator.pop(context);
-              },
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Reject'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Provider.of<SocketService>(context, listen: false).approveReceiver(receiverId);
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child: const Text('Allow'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Connection Request'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Someone wants to connect to your device. What permissions do you want to grant?'),
+                  const SizedBox(height: 16),
+                  CheckboxListTile(
+                    title: const Text("Internet Tethering"),
+                    value: allowInternet,
+                    onChanged: (val) => setStateDialog(() => allowInternet = val ?? false),
+                  ),
+                  CheckboxListTile(
+                    title: const Text("File Transfer (Photos/Downloads)"),
+                    value: allowFiles,
+                    onChanged: (val) => setStateDialog(() => allowFiles = val ?? false),
+                  ),
+                  CheckboxListTile(
+                    title: const Text("Full Disk Access (PC Only)", style: TextStyle(color: Colors.redAccent)),
+                    subtitle: const Text("Grants full control over hard disk."),
+                    value: allowDisk,
+                    onChanged: (val) => setStateDialog(() => allowDisk = val ?? false),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Provider.of<SocketService>(context, listen: false).rejectReceiver(receiverId);
+                    Navigator.pop(context);
+                  },
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('Reject'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Provider.of<SocketService>(context, listen: false).approveReceiver(receiverId, {
+                      "internet": allowInternet,
+                      "files": allowFiles,
+                      "disk": allowDisk,
+                    });
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  child: const Text('Allow'),
+                ),
+              ],
+            );
+          }
         );
       },
     );
