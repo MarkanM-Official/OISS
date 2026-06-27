@@ -50,7 +50,8 @@ receiver_state = {}        # receiver_session_uuid -> {"donor_uuid": uuid, "stat
 donor_to_receivers = {}    # donor_session_uuid -> set of receiver_session_uuids
 session_start_times = {}   
 
-MAX_SESSION_DURATION = 4 * 3600
+MAX_SESSION_DURATION_TEMP = 24 * 3600 # 24 hours for temp connections
+MAX_SESSION_DURATION_PERM = 30 * 24 * 3600 # 30 days for permanent profiles
 donor_limits = {} 
 
 async def send_routed_message(target_session_id: str, message: dict):
@@ -406,7 +407,11 @@ async def websocket_endpoint(websocket: WebSocket):
     
     try:
         while True:
-            if time.time() - session_start_times.get(session_id, 0) > MAX_SESSION_DURATION:
+            # Check session duration based on temp or perm
+            is_temp = donor_limits.get(session_id, {}).get("is_temp", True) if session_id in donor_limits else True
+            max_duration = MAX_SESSION_DURATION_TEMP if is_temp else MAX_SESSION_DURATION_PERM
+            
+            if time.time() - session_start_times.get(session_id, 0) > max_duration:
                 await websocket.close(code=1008, reason="Session max duration reached")
                 break
                 
@@ -438,6 +443,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 max_users = msg.get("max_users", 100)
                 time_limit = msg.get("time_limit_minutes", 0)
                 data_limit = msg.get("data_limit_mb", 0.0)
+                password = str(msg.get("password", "")).strip()
+                is_temp = msg.get("is_temp", True)
 
                 donors_by_code[code] = session_id
                 donor_to_receivers[session_id] = set()
@@ -446,7 +453,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     "data_limit_mb": data_limit,
                     "used_mb": 0.0,
                     "time_limit_minutes": time_limit,
-                    "is_public": is_public
+                    "is_public": is_public,
+                    "password": password,
+                    "is_temp": is_temp,
+                    "name": name
                 }
                 
                 database.register_server(
@@ -468,6 +478,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     break
                     
                 code = str(msg.get("code", "")).strip()
+                password = str(msg.get("password", "")).strip()
                 
                 donor_uuid = donors_by_code.get(code)
                 if not donor_uuid and code in donor_to_receivers:
@@ -480,6 +491,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 
                 limits = donor_limits.get(donor_uuid)
                 if limits:
+                    if not limits.get("is_temp", True) and limits.get("password", "") != "":
+                        if password != limits["password"]:
+                            privacy_manager.record_wrong_code(session_id)
+                            await websocket.send_text(json.dumps({"type": "error", "message": "Incorrect password"}))
+                            continue
+                            
                     if len(donor_to_receivers.get(donor_uuid, set())) >= limits["max_users"]:
                         await websocket.send_text(json.dumps({"type": "error", "message": "Server is full"}))
                         continue
