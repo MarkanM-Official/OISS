@@ -114,6 +114,8 @@ jobs:
   release:
     needs: [build_android, build_windows, build_linux, build_macos]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
