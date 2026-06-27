@@ -277,6 +277,17 @@ class _DonorScreenState extends State<DonorScreen> {
                   color: _isConnectedToPeer ? Colors.green : Colors.black87,
                 ),
               ),
+              if (_isConnectedToPeer) ...[
+                const SizedBox(height: 16),
+                Consumer<SocketService>(
+                  builder: (context, service, child) {
+                    return Text(
+                      "⚡ Speed: ${service.currentSpeedMBps.toStringAsFixed(2)} MB/s",
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                    );
+                  }
+                ),
+              ],
               const Spacer(),
               SizedBox(
                 width: double.infinity,

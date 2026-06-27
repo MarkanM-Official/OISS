@@ -41,6 +41,7 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
         _isConnected = true;
         _isScanning = false;
       });
+      socketService.startLocalProxy();
     };
 
     socketService.onFileReceived = (filename, base64Data) {
@@ -203,6 +204,31 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
                  const Icon(Icons.wifi, size: 80, color: Colors.blue),
                  const SizedBox(height: 20),
                  const Text("You are connected and receiving internet!", textAlign: TextAlign.center, style: TextStyle(fontSize: 18, color: Colors.green)),
+                 const SizedBox(height: 16),
+                 Consumer<SocketService>(
+                   builder: (context, service, child) {
+                     return Text(
+                       "⚡ Speed: ${service.currentSpeedMBps.toStringAsFixed(2)} MB/s",
+                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                     );
+                   }
+                 ),
+                 const SizedBox(height: 16),
+                 Container(
+                   padding: const EdgeInsets.all(16),
+                   decoration: BoxDecoration(
+                     color: Colors.amber.shade100,
+                     borderRadius: BorderRadius.circular(12)
+                   ),
+                   child: const Column(
+                     children: [
+                       Icon(Icons.settings, color: Colors.amber, size: 40),
+                       SizedBox(height: 8),
+                       Text("ACTION REQUIRED", style: TextStyle(fontWeight: FontWeight.bold)),
+                       Text("Go to your phone's WiFi settings, tap your connected WiFi, set Proxy to Manual.\nHost: 127.0.0.1\nPort: 8080", textAlign: TextAlign.center)
+                     ]
+                   )
+                 ),
                  const SizedBox(height: 40),
               ],
               Text(

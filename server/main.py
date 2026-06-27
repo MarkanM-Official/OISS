@@ -344,15 +344,24 @@ async def verify_flutter_token(req: TokenVerifyRequest, request: Request):
                 client_ip = request.client.host if request.client else "unknown"
                 now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 
-                values = [[now_str, name, email, client_ip, req.mac_address, req.device_name]]
-                body = {'values': values}
-                
-                service.spreadsheets().values().append(
+                # Check for duplicates
+                result = service.spreadsheets().values().get(
                     spreadsheetId=sheet_id,
-                    range="Sheet1!A:F",
-                    valueInputOption="USER_ENTERED",
-                    body=body
+                    range="Sheet1!C:C"
                 ).execute()
+                
+                existing_emails = [row[0] for row in result.get('values', []) if row]
+                
+                if email not in existing_emails:
+                    values = [[now_str, name, email, client_ip, req.mac_address, req.device_name]]
+                    body = {'values': values}
+                    
+                    service.spreadsheets().values().append(
+                        spreadsheetId=sheet_id,
+                        range="Sheet1!A:F",
+                        valueInputOption="USER_ENTERED",
+                        body=body
+                    ).execute()
             except Exception as e:
                 logger.error(f"Failed to log to Google Sheets: {e}")
                 
