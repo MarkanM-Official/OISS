@@ -371,7 +371,8 @@ async def verify_flutter_token(req: TokenVerifyRequest, request: Request):
 
 @app.get("/api/servers")
 def get_public_servers():
-    return database.get_public_servers()
+    # Temporarily disabled due to security review
+    return []
 
 @app.get("/api/leaderboard")
 def get_leaderboard():
@@ -509,7 +510,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         del receiver_state[receiver_id]
                         
             # --- DATA TRANSFER HANDLER ---
-            elif msg_type == "data" or msg_type == "file_transfer":
+            elif msg_type in ["data", "file_transfer", "proxy_connect", "proxy_connected", "proxy_data", "proxy_disconnect"]:
                 payload = msg.get("payload", "")
                 filename = msg.get("filename") 
                 
@@ -538,9 +539,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             await connections[donor_uuid].close(code=1008, reason="Data limit reached")
                         continue
 
-                msg_to_send = {"type": msg_type, "payload": payload}
-                if filename:
-                    msg_to_send["filename"] = filename
+                msg_to_send = msg.copy()
                 
                 if session_id in donor_to_receivers:
                     target_receiver_id = msg.get("receiver_id")
