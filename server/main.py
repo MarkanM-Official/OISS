@@ -144,6 +144,42 @@ async def admin_dashboard(request: Request):
         }
     )
 
+@app.get("/admin/test_sheets")
+async def test_sheets(request: Request):
+    user = request.session.get('user')
+    if not user or (user['email'] not in ADMIN_EMAILS and not database.is_admin(user['email'])):
+        return HTMLResponse("<h1>Access Denied</h1>", status_code=403)
+        
+    try:
+        from google.oauth2.service_account import Credentials
+        from googleapiclient.discovery import build
+        import json
+        import os
+        
+        sheet_json = os.getenv("GOOGLE_SHEET_JSON")
+        sheet_id = os.getenv("GOOGLE_SHEET_ID")
+        
+        if not sheet_json or not sheet_id:
+            return HTMLResponse("<h1>Error: Missing Env Variables!</h1><p>GOOGLE_SHEET_JSON or GOOGLE_SHEET_ID is not set on Render.</p>")
+            
+        creds_dict = json.loads(sheet_json)
+        creds = Credentials.from_service_account_info(creds_dict, scopes=['https://www.googleapis.com/auth/spreadsheets'])
+        service = build('sheets', 'v4', credentials=creds)
+        
+        values = [["Test Time", "Test Name", "Test Email", "Test IP", "Test MAC", "Test Device"]]
+        body = {'values': values}
+        
+        result = service.spreadsheets().values().append(
+            spreadsheetId=sheet_id,
+            range="Sheet1!A:F",
+            valueInputOption="USER_ENTERED",
+            body=body
+        ).execute()
+        
+        return {"success": True, "message": "Written to sheets successfully! Check your spreadsheet.", "result": result}
+    except Exception as e:
+        return {"success": False, "error_details": str(e)}
+
 @app.post("/admin/broadcast")
 async def broadcast_notification(request: Request, message: str = Form(...)):
     user = request.session.get('user')

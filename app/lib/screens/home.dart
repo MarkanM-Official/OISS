@@ -5,11 +5,56 @@ import 'receiver.dart';
 import 'relay.dart';
 import 'public_servers.dart';
 import 'plugins.dart';
+import 'package:provider/provider.dart';
+import '../services/socket_service.dart';
 
 import 'package:share_plus/share_plus.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
+
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Connect globally so broadcasts can be received immediately
+    _initGlobalSocket();
+  }
+
+  Future<void> _initGlobalSocket() async {
+    final socketService = Provider.of<SocketService>(context, listen: false);
+    if (!socketService.isConnected) {
+      await socketService.connect("wss://oiss.onrender.com/ws");
+    }
+    
+    socketService.onAdminNotification = (message) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.campaign, color: Colors.blue),
+                SizedBox(width: 10),
+                Text("Admin Broadcast"),
+              ],
+            ),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+        );
+      }
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
