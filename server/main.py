@@ -536,8 +536,10 @@ async def websocket_endpoint(websocket: WebSocket):
                         state["status"] = "connected"
                         donor_to_receivers[session_id].add(receiver_id)
                         database.update_server_stats(session_id, connections_delta=1)
+                        # Notify donor
                         await send_routed_message(session_id, {"type": "connected", "peer": receiver_id})
-                        await send_routed_message(receiver_id, {"type": "connected"})
+                        # Notify receiver
+                        await send_routed_message(receiver_id, {"type": "connected", "peer": session_id})
                             
             elif msg_type == "reject":
                 receiver_id = msg.get("receiver_id")
