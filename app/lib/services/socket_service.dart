@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -139,7 +140,11 @@ class SocketService extends ChangeNotifier {
         if (_proxyConnections.containsKey(connId)) {
           _proxyConnectedStatus[connId] = true;
           if (isConnect) {
-            _proxyConnections[connId]!.add(utf8.encode('HTTP/1.1 200 Connection Established\r\n\r\n'));
+            _proxyConnections[connId]!.add(Uint8List.fromList([
+              0x05, 0x00, 0x00, 0x01, 
+              0x00, 0x00, 0x00, 0x00, 
+              0x00, 0x00
+            ]));
           }
         }
         break;
@@ -213,46 +218,53 @@ class SocketService extends ChangeNotifier {
   Future<void> startLocalProxy() async {
     if (_proxyServer != null) return;
     try {
-      _proxyServer = await ServerSocket.bind(InternetAddress.loopbackIPv4, 8080);
+      _proxyServer = await ServerSocket.bind(InternetAddress.loopbackIPv4, 1080);
       _proxyServer!.listen((Socket clientSocket) {
         int connId = _nextProxyConnId++;
         _proxyConnections[connId] = clientSocket;
         _proxyConnectedStatus[connId] = false;
         
-        List<int> buffer = [];
+        int state = 0; // 0: wait greeting, 1: wait connect, 2: forwarding
         
         clientSocket.listen((Uint8List data) {
-          if (!_proxyConnectedStatus[connId]!) {
-            buffer.addAll(data);
-            String request = String.fromCharCodes(buffer);
-            if (request.contains('\r\n\r\n')) {
-              if (request.startsWith('CONNECT')) {
-                List<String> parts = request.split(' ');
-                if (parts.length > 1) {
-                  _send({
-                    'type': 'proxy_connect',
-                    'conn_id': connId,
-                    'target': parts[1],
-                    'is_connect': true
-                  });
-                }
-              } else {
-                RegExp hostRegex = RegExp(r'Host:\s*([^\r\n]+)', caseSensitive: false);
-                var match = hostRegex.firstMatch(request);
-                if (match != null) {
-                  String target = match.group(1)!.trim();
-                  if (!target.contains(':')) target = '$target:80';
-                  _send({
-                    'type': 'proxy_connect',
-                    'conn_id': connId,
-                    'target': target,
-                    'is_connect': false,
-                    'initial_data': base64Encode(buffer)
-                  });
-                } else {
-                  clientSocket.destroy();
-                }
+          if (state == 0) {
+            if (data.isNotEmpty && data[0] == 0x05) {
+              clientSocket.add(Uint8List.fromList([0x05, 0x00]));
+              state = 1;
+            } else {
+              clientSocket.destroy();
+            }
+          } else if (state == 1) {
+            if (data.length > 4 && data[0] == 0x05 && data[1] == 0x01) {
+              int addrType = data[3];
+              String targetHost = "";
+              int port = 0;
+              int offset = 4;
+              
+              if (addrType == 0x01) {
+                targetHost = "${data[4]}.${data[5]}.${data[6]}.${data[7]}";
+                offset = 8;
+              } else if (addrType == 0x03) {
+                int len = data[4];
+                targetHost = String.fromCharCodes(data.sublist(5, 5 + len));
+                offset = 5 + len;
+              } else if (addrType == 0x04) {
+                clientSocket.destroy();
+                return;
               }
+              
+              port = (data[offset] << 8) | data[offset + 1];
+              
+              _send({
+                'type': 'proxy_connect',
+                'conn_id': connId,
+                'target': '$targetHost:$port',
+                'is_connect': true
+              });
+              
+              state = 2;
+            } else {
+              clientSocket.destroy();
             }
           } else {
             _send({
@@ -350,6 +362,12 @@ class SocketService extends ChangeNotifier {
     _isConnected = false;
     _stopSpeedTimer();
     stopLocalProxy();
+    
+    // Attempt to stop the VPN if it's running
+    try {
+      const MethodChannel('com.oiss.vpn/control').invokeMethod('stopVpn');
+    } catch (_) {}
+    
     notifyListeners();
   }
 }

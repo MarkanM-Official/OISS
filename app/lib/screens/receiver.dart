@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:flutter/services.dart';
 import '../services/socket_service.dart';
 
 class ReceiverScreen extends StatefulWidget {
@@ -35,13 +36,32 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
       });
     };
 
-    socketService.onConnected = (_) {
+    socketService.onConnected = (_) async {
       setState(() {
-        _status = "Connected! Receiving internet.";
+        _status = "Connected! Starting VPN...";
         _isConnected = true;
         _isScanning = false;
       });
       socketService.startLocalProxy();
+      
+      // Start VPN Service natively
+      const platform = MethodChannel('com.oiss.vpn/control');
+      try {
+        final bool result = await platform.invokeMethod('startVpn');
+        if (result) {
+           setState(() {
+             _status = "VPN Tunnel Active! Global internet sharing enabled.";
+           });
+        } else {
+           setState(() {
+             _status = "Please grant VPN permissions and try again.";
+           });
+        }
+      } catch (e) {
+        setState(() {
+          _status = "Failed to start VPN: $e";
+        });
+      }
     };
 
     socketService.onFileReceived = (filename, base64Data) {
@@ -201,9 +221,9 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
                 ),
                 const SizedBox(height: 40),
               ] else ...[
-                 const Icon(Icons.wifi, size: 80, color: Colors.blue),
+                 const Icon(Icons.vpn_key, size: 80, color: Colors.blue),
                  const SizedBox(height: 20),
-                 const Text("You are connected and receiving internet!", textAlign: TextAlign.center, style: TextStyle(fontSize: 18, color: Colors.green)),
+                 const Text("VPN Tunnel is Active!", textAlign: TextAlign.center, style: TextStyle(fontSize: 18, color: Colors.green, fontWeight: FontWeight.bold)),
                  const SizedBox(height: 16),
                  Consumer<SocketService>(
                    builder: (context, service, child) {
@@ -214,21 +234,7 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
                    }
                  ),
                  const SizedBox(height: 16),
-                 Container(
-                   padding: const EdgeInsets.all(16),
-                   decoration: BoxDecoration(
-                     color: Colors.amber.shade100,
-                     borderRadius: BorderRadius.circular(12)
-                   ),
-                   child: const Column(
-                     children: [
-                       Icon(Icons.settings, color: Colors.amber, size: 40),
-                       SizedBox(height: 8),
-                       Text("ACTION REQUIRED", style: TextStyle(fontWeight: FontWeight.bold)),
-                       Text("Go to your phone's WiFi settings, tap your connected WiFi, set Proxy to Manual.\nHost: 127.0.0.1\nPort: 8080", textAlign: TextAlign.center)
-                     ]
-                   )
-                 ),
+                 const Text("All your phone's apps and browser traffic is now securely routed through the Donor device. You can verify this by checking your IP on whatsmyip.com", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
                  const SizedBox(height: 40),
               ],
               Text(
