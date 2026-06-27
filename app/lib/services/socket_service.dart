@@ -23,6 +23,7 @@ class SocketService extends ChangeNotifier {
   
   // Donor proxy connections
   final Map<int, Socket> _donorProxyConnections = {};
+  final Map<int, String> _donorConnToReceiver = {};
 
   double get currentSpeedMBps => _currentSpeedMBps;
 
@@ -176,6 +177,11 @@ class SocketService extends ChangeNotifier {
     int connId = msg['conn_id'];
     String target = msg['target'];
     String? initialData = msg['initial_data'];
+    String? receiverId = msg['receiver_id'];
+    
+    if (receiverId != null) {
+      _donorConnToReceiver[connId] = receiverId;
+    }
     
     List<String> targetParts = target.split(':');
     if (targetParts.length == 2) {
@@ -188,7 +194,8 @@ class SocketService extends ChangeNotifier {
         _send({
           'type': 'proxy_connected',
           'conn_id': connId,
-          'is_connect': msg['is_connect'] ?? false
+          'is_connect': msg['is_connect'] ?? false,
+          if (receiverId != null) 'receiver_id': receiverId
         });
         
         if (initialData != null) {
@@ -199,18 +206,22 @@ class SocketService extends ChangeNotifier {
           _send({
             'type': 'proxy_data',
             'conn_id': connId,
-            'payload': base64Encode(data)
+            'payload': base64Encode(data),
+            if (receiverId != null) 'receiver_id': receiverId
           });
           _bytesReceivedSinceLastTick += data.length;
         }, onDone: () {
-          _send({'type': 'proxy_disconnect', 'conn_id': connId});
+          _send({'type': 'proxy_disconnect', 'conn_id': connId, if (receiverId != null) 'receiver_id': receiverId});
           _donorProxyConnections.remove(connId);
+          _donorConnToReceiver.remove(connId);
         }, onError: (e) {
-          _send({'type': 'proxy_disconnect', 'conn_id': connId});
+          _send({'type': 'proxy_disconnect', 'conn_id': connId, if (receiverId != null) 'receiver_id': receiverId});
           _donorProxyConnections.remove(connId);
+          _donorConnToReceiver.remove(connId);
         });
       }).catchError((e) {
-        _send({'type': 'proxy_disconnect', 'conn_id': connId});
+        _send({'type': 'proxy_disconnect', 'conn_id': connId, if (receiverId != null) 'receiver_id': receiverId});
+        _donorConnToReceiver.remove(connId);
       });
     }
   }
@@ -298,6 +309,7 @@ class SocketService extends ChangeNotifier {
       socket.destroy();
     }
     _donorProxyConnections.clear();
+    _donorConnToReceiver.clear();
   }
 
   void registerAsDonor(String code) {
