@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+
 import 'donor_setup.dart';
-import 'donor_settings.dart';
 import 'receiver.dart';
 import 'relay.dart';
-import 'public_servers.dart';
 import 'plugins.dart';
-import 'package:provider/provider.dart';
 import '../services/socket_service.dart';
 
-import 'package:share_plus/share_plus.dart';
+// Placeholders for new screens
+import 'donor_profile.dart'; // We will create this
+import 'wifi_list.dart'; // We will create this
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -18,10 +20,17 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  int _currentIndex = 1; // Default to Receive (Wi-Fi list)
+
+  final List<Widget> _tabs = [
+    const DonorSetupScreen(),
+    const WifiListScreen(), // Replacing ReceiverScreen
+    const DonorProfileScreen(), // New Dashboard
+  ];
+
   @override
   void initState() {
     super.initState();
-    // Connect globally so broadcasts can be received immediately
     _initGlobalSocket();
   }
 
@@ -60,7 +69,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('OISS'),
+        title: const Text('OISS', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2)),
+        centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.share),
@@ -73,150 +83,81 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 40),
-              const Text(
-                'OISS',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 48,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF312e81), Color(0xFF0f172a)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Share internet. Help someone.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.grey,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('OISS Advanced', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 8),
+                  Text('Open Source | Privacy First', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                ],
               ),
-              const Spacer(),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const DonorSetupScreen()),
-                  );
-                },
-                icon: const Icon(Icons.wifi_tethering, size: 32),
-                label: const Padding(
-                  padding: EdgeInsets.all(20.0),
-                  child: Text('Donate Internet', style: TextStyle(fontSize: 20)),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4CAF50),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const ReceiverScreen()),
-                  );
-                },
-                icon: const Icon(Icons.wifi, size: 32),
-                label: const Padding(
-                  padding: EdgeInsets.all(20.0),
-                  child: Text('Receive Internet', style: TextStyle(fontSize: 20)),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2196F3),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const PublicServersScreen()),
-                  );
-                },
-                icon: const Icon(Icons.public, size: 32),
-                label: const Padding(
-                  padding: EdgeInsets.all(20.0),
-                  child: Text('Public Server List', style: TextStyle(fontSize: 20)),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const RelayScreen()),
-                  );
-                },
-                icon: const Icon(Icons.router, size: 32),
-                label: const Padding(
-                  padding: EdgeInsets.all(20.0),
-                  child: Text('Run as Relay Node', style: TextStyle(fontSize: 20)),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const PluginsScreen()),
-                  );
-                },
-                icon: const Icon(Icons.extension, size: 32),
-                label: const Padding(
-                  padding: EdgeInsets.all(20.0),
-                  child: Text('Plugins & SDK', style: TextStyle(fontSize: 20)),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-              const Spacer(),
-              const Text(
-                'Open Source | Privacy First',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.router, color: Colors.purple),
+              title: const Text('Run as Relay Node'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const RelayScreen()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.extension, color: Colors.orange),
+              title: const Text('Plugins & SDK'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const PluginsScreen()));
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.computer, color: Colors.blue),
+              title: const Text('Device Connection (Advanced)'),
+              subtitle: const Text('Remote Disk & File Control'),
+              onTap: () {
+                Navigator.pop(context);
+                // We will navigate to advanced device connection screen here
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Device Connection feature coming soon for PC builds.")));
+              },
+            ),
+          ],
         ),
+      ),
+      body: _tabs[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        selectedItemColor: Colors.blueAccent,
+        unselectedItemColor: Colors.grey,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.wifi_tethering),
+            label: 'Donate',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.wifi),
+            label: 'Receive',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Profile',
+          ),
+        ],
       ),
     );
   }
