@@ -146,7 +146,7 @@ async def broadcast_notification(request: Request, message: str = Form(...)):
         except:
             pass
             
-    return RedirectResponse(url='/admin/dashboard?msg=Broadcast+Sent')
+    return RedirectResponse(url='/admin/dashboard?msg=Broadcast+Sent', status_code=303)
 
 # --- App Token Flow (For Desktop/All Platforms) ---
 import jwt
