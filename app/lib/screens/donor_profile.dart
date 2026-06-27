@@ -30,28 +30,28 @@ class _DonorProfileScreenState extends State<DonorProfileScreen> {
 
   Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
+    
+    String tempUid = prefs.getString('permanent_uid') ?? "";
+    if (tempUid.isEmpty) {
+      try {
+        final response = await http.get(Uri.parse('https://oiss.onrender.com/api/generate_uid'));
+        if (response.statusCode == 200) {
+          tempUid = jsonDecode(response.body)['uid'];
+        } else {
+          tempUid = (100000000 + Random().nextInt(899999999)).toString();
+        }
+      } catch (e) {
+        tempUid = (100000000 + Random().nextInt(899999999)).toString();
+      }
+      await prefs.setString('permanent_uid', tempUid);
+    }
+
     setState(() {
       _nameController.text = prefs.getString('wifi_name') ?? "My OISS Network";
       _passwordController.text = prefs.getString('wifi_password') ?? "";
       _dataLimitMB = (prefs.get('data_limit_mb') as num?)?.toDouble() ?? 0.0;
       _maxUsers = (prefs.get('max_users') as num?)?.toDouble() ?? 5.0;
-      
-      _permanentUid = prefs.getString('permanent_uid') ?? "";
-      
-      if (_permanentUid.isEmpty) {
-        try {
-          final response = await http.get(Uri.parse('https://oiss.onrender.com/api/generate_uid'));
-          if (response.statusCode == 200) {
-            _permanentUid = jsonDecode(response.body)['uid'];
-          } else {
-            _permanentUid = (100000000 + Random().nextInt(899999999)).toString(); // Fallback
-          }
-        } catch (e) {
-          _permanentUid = (100000000 + Random().nextInt(899999999)).toString(); // Fallback
-        }
-        await prefs.setString('permanent_uid', _permanentUid);
-      }
-      
+      _permanentUid = tempUid;
       _isLoading = false;
     });
   }
