@@ -188,10 +188,7 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
   }
 
   void _disconnect() {
-    final socket = Provider.of<SocketService>(context, listen: false);
-    // Ideally we send a disconnect msg, but we can just stop local proxy and pop
-    socket.stopLocalProxy();
-    // To properly disconnect from backend, we can just reconnect socket or send leave
+    _stopVpnAndDisconnect();
     Navigator.pop(context);
   }
 
