@@ -248,54 +248,91 @@ class SocketService extends ChangeNotifier {
         _proxyConnectedStatus[connId] = false;
         
         int state = 0; // 0: wait greeting, 1: wait connect, 2: forwarding
+        List<int> buffer = [];
         
         clientSocket.listen((Uint8List data) {
-          if (state == 0) {
-            if (data.isNotEmpty && data[0] == 0x05) {
-              clientSocket.add(Uint8List.fromList([0x05, 0x00]));
-              state = 1;
-            } else {
-              clientSocket.destroy();
-            }
-          } else if (state == 1) {
-            if (data.length > 4 && data[0] == 0x05 && data[1] == 0x01) {
-              int addrType = data[3];
-              String targetHost = "";
-              int port = 0;
-              int offset = 4;
-              
-              if (addrType == 0x01) {
-                targetHost = "${data[4]}.${data[5]}.${data[6]}.${data[7]}";
-                offset = 8;
-              } else if (addrType == 0x03) {
-                int len = data[4];
-                targetHost = String.fromCharCodes(data.sublist(5, 5 + len));
-                offset = 5 + len;
-              } else if (addrType == 0x04) {
-                clientSocket.destroy();
-                return;
-              }
-              
-              port = (data[offset] << 8) | data[offset + 1];
-              
-              _send({
-                'type': 'proxy_connect',
-                'conn_id': connId,
-                'target': '$targetHost:$port',
-                'is_connect': true
-              });
-              
-              state = 2;
-            } else {
-              clientSocket.destroy();
-            }
-          } else {
+          if (state == 2) {
             _send({
               'type': 'proxy_data',
               'conn_id': connId,
               'payload': base64Encode(data)
             });
             _bytesReceivedSinceLastTick += data.length;
+            return;
+          }
+          
+          buffer.addAll(data);
+          
+          while (buffer.isNotEmpty && state != 2) {
+            if (state == 0) {
+              if (buffer.length >= 2) {
+                int numMethods = buffer[1];
+                if (buffer.length >= 2 + numMethods) {
+                  buffer.removeRange(0, 2 + numMethods);
+                  clientSocket.add(Uint8List.fromList([0x05, 0x00]));
+                  state = 1;
+                } else {
+                  break; // wait for more data
+                }
+              } else {
+                break;
+              }
+            } else if (state == 1) {
+              if (buffer.length >= 4) {
+                int addrType = buffer[3];
+                int offset = 4;
+                String targetHost = "";
+                
+                if (addrType == 0x01) { // IPv4
+                  if (buffer.length >= 4 + 4 + 2) {
+                    targetHost = "${buffer[4]}.${buffer[5]}.${buffer[6]}.${buffer[7]}";
+                    offset = 8;
+                  } else { break; }
+                } else if (addrType == 0x03) { // Domain
+                  if (buffer.length >= 5) {
+                    int len = buffer[4];
+                    if (buffer.length >= 5 + len + 2) {
+                      targetHost = String.fromCharCodes(buffer.sublist(5, 5 + len));
+                      offset = 5 + len;
+                    } else { break; }
+                  } else { break; }
+                } else if (addrType == 0x04) { // IPv6 (ignore for now)
+                  if (buffer.length >= 4 + 16 + 2) {
+                    targetHost = "ipv6-unsupported";
+                    offset = 4 + 16;
+                  } else { break; }
+                } else {
+                  clientSocket.destroy();
+                  return;
+                }
+                
+                int port = (buffer[offset] << 8) | buffer[offset + 1];
+                offset += 2;
+                
+                buffer.removeRange(0, offset);
+                
+                _send({
+                  'type': 'proxy_connect',
+                  'conn_id': connId,
+                  'target': '$targetHost:$port',
+                  'is_connect': true
+                });
+                
+                state = 2;
+              } else {
+                break;
+              }
+            }
+          }
+          
+          if (state == 2 && buffer.isNotEmpty) {
+            _send({
+              'type': 'proxy_data',
+              'conn_id': connId,
+              'payload': base64Encode(buffer)
+            });
+            _bytesReceivedSinceLastTick += buffer.length;
+            buffer.clear();
           }
         }, onDone: () {
           _send({'type': 'proxy_disconnect', 'conn_id': connId});
