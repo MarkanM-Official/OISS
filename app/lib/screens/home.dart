@@ -4,7 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'donor_setup.dart';
-import 'receiver.dart';
+
 import 'relay.dart';
 import 'plugins.dart';
 import '../services/socket_service.dart';
