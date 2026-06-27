@@ -26,8 +26,18 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
     });
   }
 
-  void _connectToOiss() {
+  Future<void> _connectToOiss() async {
     final socket = Provider.of<SocketService>(context, listen: false);
+    
+    try {
+      await socket.connect("wss://oiss.onrender.com/ws");
+    } catch (e) {
+      if (mounted) {
+        setState(() => _status = "Connection Error");
+        _showError("Could not connect to server: $e");
+      }
+      return;
+    }
     
     // Set up listeners
     socket.onWaitingApproval = () {
