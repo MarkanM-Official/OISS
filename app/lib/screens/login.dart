@@ -22,6 +22,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
+  double _downloadProgress = 0.0;
   final TextEditingController _tokenController = TextEditingController();
   
   // Replace this with your actual Render backend URL
@@ -99,21 +100,66 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _downloadAndInstallUpdate() async {
     setState(() => _isLoading = true);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Downloading update... Please wait.')));
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Downloading Update'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LinearProgressIndicator(value: _downloadProgress > 0 ? _downloadProgress : null),
+                  const SizedBox(height: 10),
+                  Text('${(_downloadProgress * 100).toStringAsFixed(1)}% Completed'),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
     try {
       final url = 'https://github.com/MarkanM-Official/OISS/releases/latest/download/app-release.apk';
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200) {
-        final dir = await getExternalStorageDirectory();
-        final file = File('${dir!.path}/oiss_update.apk');
-        await file.writeAsBytes(response.bodyBytes);
-        await OpenFilex.open(file.path);
-      } else {
-        _showError("Failed to download update.");
-      }
+      final client = http.Client();
+      final request = http.Request('GET', Uri.parse(url));
+      final response = await client.send(request);
+      
+      final contentLength = response.contentLength ?? 1;
+      int downloaded = 0;
+      List<int> bytes = [];
+      
+      response.stream.listen(
+        (List<int> newBytes) {
+          bytes.addAll(newBytes);
+          downloaded += newBytes.length;
+          setState(() {
+            _downloadProgress = downloaded / contentLength;
+          });
+          // To update the dialog specifically, but setState on main screen will also rebuild if mounted correctly.
+        },
+        onDone: () async {
+          Navigator.pop(context); // close progress dialog
+          final dir = await getExternalStorageDirectory();
+          final file = File('${dir!.path}/oiss_update.apk');
+          await file.writeAsBytes(bytes);
+          await OpenFilex.open(file.path);
+          setState(() => _isLoading = false);
+        },
+        onError: (e) {
+          Navigator.pop(context);
+          _showError("Error downloading: $e");
+          setState(() => _isLoading = false);
+        },
+        cancelOnError: true,
+      );
     } catch (e) {
-      _showError("Error downloading: $e");
-    } finally {
+      Navigator.pop(context);
+      _showError("Error: $e");
       setState(() => _isLoading = false);
     }
   }
