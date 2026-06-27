@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import '../services/socket_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:flutter_background/flutter_background.dart';
 
 class DonorScreen extends StatefulWidget {
   final bool isPublic;
@@ -77,6 +78,7 @@ class _DonorScreenState extends State<DonorScreen> {
       setState(() {
         _status = widget.isPublic ? "Public Server Active. Waiting for peers..." : "Waiting for someone to connect...";
       });
+      FlutterBackground.enableBackgroundExecution();
     }
 
     socketService.onApprovalRequest = (receiverId) {
@@ -129,6 +131,17 @@ class _DonorScreenState extends State<DonorScreen> {
       setState(() {
         _status = "Error: $error";
       });
+    };
+    
+    socketService.onDisconnected = () {
+      if (mounted) {
+        setState(() {
+          _isConnectedToPeer = false;
+          _connectedUsers = _connectedUsers > 0 ? _connectedUsers - 1 : 0;
+          _status = "Peer disconnected. Waiting for connection...";
+        });
+        _timer?.cancel();
+      }
     };
   }
 
@@ -218,6 +231,7 @@ class _DonorScreenState extends State<DonorScreen> {
   void dispose() {
     _timer?.cancel();
     Provider.of<SocketService>(context, listen: false).disconnect();
+    FlutterBackground.disableBackgroundExecution();
     super.dispose();
   }
 
@@ -331,9 +345,35 @@ class _DonorScreenState extends State<DonorScreen> {
                 const SizedBox(height: 16),
                 Consumer<SocketService>(
                   builder: (context, service, child) {
-                    return Text(
-                      "⚡ Speed: ${service.currentSpeedMBps.toStringAsFixed(2)} MB/s",
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                    return Column(
+                      children: [
+                        if (service.connectedPeer != null) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.person, color: Colors.blue, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  service.connectedPeer!,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        Text(
+                          "⚡ Speed: ${service.currentSpeedMBps.toStringAsFixed(2)} MB/s",
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                        ),
+                      ],
                     );
                   }
                 ),

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_v2ray/flutter_v2ray.dart';
 import '../services/socket_service.dart';
 import 'dart:io' show Platform;
+import 'package:flutter_background/flutter_background.dart';
 
 class WifiDetailsScreen extends StatefulWidget {
   final String uid;
@@ -49,6 +50,23 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
   Future<void> _initV2Ray() async {
     if (Platform.isAndroid) {
       await flutterV2ray.initializeV2Ray();
+    }
+  }
+
+  Future<void> _stopVpnAndDisconnect() async {
+    final socket = Provider.of<SocketService>(context, listen: false);
+    socket.disconnect();
+    if (Platform.isAndroid) {
+      await flutterV2ray.stopV2Ray();
+    }
+    try {
+      FlutterBackground.disableBackgroundExecution();
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _isConnected = false;
+        _status = "Disconnected";
+      });
     }
   }
 
@@ -139,6 +157,7 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
           config: jsonEncode(config),
           proxyOnly: false,
         );
+        FlutterBackground.enableBackgroundExecution();
       } else {
         _showError("VPN Permission Denied. Cannot share internet.");
       }
@@ -149,9 +168,7 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
 
   @override
   void dispose() {
-    if (Platform.isAndroid) {
-      flutterV2ray.stopV2Ray();
-    }
+    _stopVpnAndDisconnect();
     super.dispose();
   }
 

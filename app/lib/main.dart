@@ -4,7 +4,19 @@ import 'screens/home.dart';
 import 'screens/login.dart';
 import 'services/socket_service.dart';
 
-void main() {
+import 'package:flutter_background/flutter_background.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  const androidConfig = FlutterBackgroundAndroidConfig(
+    notificationTitle: "OISS Background Service",
+    notificationText: "OISS is keeping your connection alive in the background.",
+    notificationImportance: AndroidNotificationImportance.normal,
+    notificationIcon: AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
+  );
+  await FlutterBackground.initialize(androidConfig: androidConfig);
+  
   runApp(
     MultiProvider(
       providers: [

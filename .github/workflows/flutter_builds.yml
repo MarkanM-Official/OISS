@@ -28,6 +28,9 @@ jobs:
       - name: Install Dependencies
         run: cd app && flutter pub get
 
+      - name: Accept Android Licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
       - name: Build APK
         run: cd app && flutter build apk --release --build-name=1.0.${{ github.run_number }}
 
@@ -37,82 +40,8 @@ jobs:
           name: oiss-android-apk
           path: app/build/app/outputs/flutter-apk/app-release.apk
 
-  build_windows:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-
-      - name: Install Dependencies
-        run: cd app && flutter pub get
-
-      - name: Build Windows
-        run: cd app && flutter build windows --release
-
-      - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: oiss-windows-exe
-          path: app/build/windows/x64/runner/Release/
-
-  build_linux:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-
-      - name: Install Linux Build Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
-
-      - name: Install App Dependencies
-        run: cd app && flutter pub get
-
-      - name: Build Linux
-        run: cd app && flutter build linux --release
-
-      - name: Upload Linux Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: oiss-linux-deb
-          path: app/build/linux/x64/release/bundle/
-
-  build_macos:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-
-      - name: Install Dependencies
-        run: cd app && flutter pub get
-
-      - name: Build MacOS
-        run: cd app && flutter build macos --release
-
-      - name: Upload MacOS Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: oiss-macos-app
-          path: app/build/macos/Build/Products/Release/
-
   release:
-    needs: [build_android, build_windows, build_linux, build_macos]
+    needs: [build_android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -126,30 +55,6 @@ jobs:
           name: oiss-android-apk
           path: artifacts/android
 
-      - name: Download Windows
-        uses: actions/download-artifact@v4
-        with:
-          name: oiss-windows-exe
-          path: artifacts/windows
-          
-      - name: Download Linux
-        uses: actions/download-artifact@v4
-        with:
-          name: oiss-linux-deb
-          path: artifacts/linux
-          
-      - name: Download MacOS
-        uses: actions/download-artifact@v4
-        with:
-          name: oiss-macos-app
-          path: artifacts/macos
-          
-      - name: Zip Windows and Linux Builds
-        run: |
-          sudo apt-get update && sudo apt-get install -y zip
-          cd artifacts/windows && zip -r ../oiss-windows.zip .
-          cd ../linux && zip -r ../oiss-linux.zip .
-
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -158,7 +63,5 @@ jobs:
           make_latest: true
           files: |
             artifacts/android/app-release.apk
-            artifacts/oiss-windows.zip
-            artifacts/oiss-linux.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
