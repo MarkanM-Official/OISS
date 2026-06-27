@@ -22,13 +22,13 @@ class SocketService extends ChangeNotifier {
 
   // Proxy state
   ServerSocket? _proxyServer;
-  final Map<int, Socket> _proxyConnections = {};
+  final Map<String, Socket> _proxyConnections = {};
   int _nextProxyConnId = 1;
-  final Map<int, bool> _proxyConnectedStatus = {};
+  final Map<String, bool> _proxyConnectedStatus = {};
   
   // Donor proxy connections
-  final Map<int, Socket> _donorProxyConnections = {};
-  final Map<int, String> _donorConnToReceiver = {};
+  final Map<String, Socket> _donorProxyConnections = {};
+  final Map<String, String> _donorConnToReceiver = {};
 
   double get currentSpeedMBps => _currentSpeedMBps;
 
@@ -52,6 +52,7 @@ class SocketService extends ChangeNotifier {
     
     try {
       _channel = WebSocketChannel.connect(Uri.parse(serverUrl));
+      await _channel!.ready;
       _isConnected = true;
       _startSpeedTimer();
       notifyListeners();
@@ -148,7 +149,7 @@ class SocketService extends ChangeNotifier {
         _handleProxyConnect(msg);
         break;
       case 'proxy_connected':
-        int connId = msg['conn_id'];
+        String connId = msg['conn_id'].toString();
         bool isConnect = msg['is_connect'] ?? false;
         if (_proxyConnections.containsKey(connId)) {
           _proxyConnectedStatus[connId] = true;
@@ -162,7 +163,7 @@ class SocketService extends ChangeNotifier {
         }
         break;
       case 'proxy_data':
-        int connId = msg['conn_id'];
+        String connId = msg['conn_id'].toString();
         Uint8List payload = base64Decode(msg['payload']);
         _bytesReceivedSinceLastTick += payload.length;
         if (_proxyConnections.containsKey(connId)) {
@@ -172,7 +173,7 @@ class SocketService extends ChangeNotifier {
         }
         break;
       case 'proxy_disconnect':
-        int connId = msg['conn_id'];
+        String connId = msg['conn_id'].toString();
         if (_proxyConnections.containsKey(connId)) {
           _proxyConnections[connId]!.destroy();
           _proxyConnections.remove(connId);
@@ -186,7 +187,7 @@ class SocketService extends ChangeNotifier {
   }
 
   void _handleProxyConnect(Map<String, dynamic> msg) {
-    int connId = msg['conn_id'];
+    String connId = msg['conn_id'].toString();
     String target = msg['target'];
     String? initialData = msg['initial_data'];
     String? receiverId = msg['receiver_id'];
@@ -242,8 +243,11 @@ class SocketService extends ChangeNotifier {
     if (_proxyServer != null) return;
     try {
       _proxyServer = await ServerSocket.bind(InternetAddress.loopbackIPv4, 1081);
+      
+      String sessionPrefix = DateTime.now().millisecondsSinceEpoch.toString();
+      
       _proxyServer!.listen((Socket clientSocket) {
-        int connId = _nextProxyConnId++;
+        String connId = '${sessionPrefix}_${_nextProxyConnId++}';
         _proxyConnections[connId] = clientSocket;
         _proxyConnectedStatus[connId] = false;
         
