@@ -317,7 +317,7 @@ class SocketService extends ChangeNotifier {
   }
 
   void registerAsDonorConfigured(Map<String, dynamic> config) {
-    var payload = {'type': 'register_donor'};
+    Map<String, dynamic> payload = {'type': 'register_donor'};
     payload.addAll(config);
     _send(payload);
   }
