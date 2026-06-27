@@ -106,13 +106,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       final Uri url = Uri.parse('https://markanm.com');
                       launchUrl(url, mode: LaunchMode.externalApplication);
                     },
-                    child: const Text(
-                      'Powered by MarkanM',
-                      style: TextStyle(
-                        color: Colors.blueAccent,
-                        fontSize: 14,
-                        decoration: TextDecoration.underline,
-                        decorationColor: Colors.blueAccent,
+                    child: RichText(
+                      text: const TextSpan(
+                        text: 'Powered by ',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                        children: [
+                          TextSpan(
+                            text: 'MarkanM',
+                            style: TextStyle(color: Colors.lightBlueAccent, fontSize: 14),
+                          )
+                        ],
                       ),
                     ),
                   ),

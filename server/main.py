@@ -367,7 +367,8 @@ async def verify_flutter_token(req: TokenVerifyRequest, request: Request):
                 logger.error(f"Failed to log to Google Sheets: {e}")
                 
         return {"status": "success", "email": email, "name": name}
-    except ValueError:
+    except Exception as e:
+        logger.error(f"Token verification failed: {e}")
         raise HTTPException(status_code=401, detail="Invalid token")
 
 @app.get("/api/servers")

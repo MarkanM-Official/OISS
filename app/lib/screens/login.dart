@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io' show Platform, File;
 
 import '../main.dart'; // To navigate to home screen
@@ -29,8 +30,18 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _checkSavedToken();
     if (!kIsWeb && Platform.isAndroid) {
       _checkForUpdates();
+    }
+  }
+
+  Future<void> _checkSavedToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    if (token != null && token.isNotEmpty) {
+      _tokenController.text = token;
+      _verifyTokenWithBackend();
     }
   }
 
@@ -160,10 +171,16 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (response.statusCode == 200) {
+        // Save the token for future auto-login
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', idToken);
+        
         // Verification successful, navigate to Home
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        }
       } else {
         _showError("Backend Verification Failed: ${response.statusCode}");
       }
