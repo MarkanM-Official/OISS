@@ -2,9 +2,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:device_info_plus/device_info_plus.dart';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io' show Platform, File;
 
 import '../main.dart'; // To navigate to home screen
 import 'home.dart';
@@ -22,6 +25,87 @@ class _LoginScreenState extends State<LoginScreen> {
   
   // Replace this with your actual Render backend URL
   final String _backendUrl = "https://oiss.onrender.com"; 
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb && Platform.isAndroid) {
+      _checkForUpdates();
+    }
+  }
+
+  Future<void> _checkForUpdates() async {
+    try {
+      final response = await http.get(Uri.parse('https://api.github.com/repos/MarkanM-Official/OISS/releases/latest'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final latestTag = data['tag_name'] as String; // e.g. "v1.0.123"
+        final latestVersion = latestTag.replaceAll('v', '');
+        
+        final packageInfo = await PackageInfo.fromPlatform();
+        final currentVersion = packageInfo.version; 
+
+        if (_isNewer(latestVersion, currentVersion)) {
+           _showUpdateDialog(latestVersion);
+        }
+      }
+    } catch (e) {
+      debugPrint("Update check failed: $e");
+    }
+  }
+
+  bool _isNewer(String latest, String current) {
+    List<int> l = latest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    List<int> c = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    for (int i = 0; i < 3; i++) {
+      int lv = i < l.length ? l[i] : 0;
+      int cv = i < c.length ? c[i] : 0;
+      if (lv > cv) return true;
+      if (lv < cv) return false;
+    }
+    return false;
+  }
+
+  void _showUpdateDialog(String newVersion) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Update Available'),
+        content: Text('OISS version $newVersion is available! Please update to continue.'),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _downloadAndInstallUpdate();
+            },
+            child: const Text('Update Now'),
+          )
+        ],
+      ),
+    );
+  }
+
+  Future<void> _downloadAndInstallUpdate() async {
+    setState(() => _isLoading = true);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Downloading update... Please wait.')));
+    try {
+      final url = 'https://github.com/MarkanM-Official/OISS/releases/latest/download/app-release.apk';
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final dir = await getExternalStorageDirectory();
+        final file = File('${dir!.path}/oiss_update.apk');
+        await file.writeAsBytes(response.bodyBytes);
+        await OpenFilex.open(file.path);
+      } else {
+        _showError("Failed to download update.");
+      }
+    } catch (e) {
+      _showError("Error downloading: $e");
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
 
   Future<void> _openWebLogin() async {
     final Uri url = Uri.parse('$_backendUrl/app/login');

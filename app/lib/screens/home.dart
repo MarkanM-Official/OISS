@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'donor_setup.dart';
 import 'receiver.dart';
@@ -87,8 +88,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(
+            DrawerHeader(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Color(0xFF312e81), Color(0xFF0f172a)],
                   begin: Alignment.topLeft,
@@ -98,9 +99,23 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('OISS Advanced', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 8),
-                  Text('Open Source | Privacy First', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                  const Text('OISS', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () {
+                      final Uri url = Uri.parse('https://markanm.com');
+                      launchUrl(url, mode: LaunchMode.externalApplication);
+                    },
+                    child: const Text(
+                      'Powered by MarkanM',
+                      style: TextStyle(
+                        color: Colors.blueAccent,
+                        fontSize: 14,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Colors.blueAccent,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
