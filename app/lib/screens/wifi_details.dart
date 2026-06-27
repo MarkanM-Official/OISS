@@ -19,12 +19,14 @@ class WifiDetailsScreen extends StatefulWidget {
 class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
   String _status = "Connecting...";
   bool _isConnected = false;
+  late String _displayIp;
 
   late FlutterV2ray flutterV2ray;
 
   @override
   void initState() {
     super.initState();
+    _displayIp = "10.0.0.${DateTime.now().millisecond % 200 + 2}";
     flutterV2ray = FlutterV2ray(
       onStatusChanged: (status) {
         if (mounted) {
@@ -53,6 +55,16 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
   Future<void> _connectToOiss() async {
     final socket = Provider.of<SocketService>(context, listen: false);
     
+    if (socket.isConnected && socket.connectedPeer == widget.uid) {
+      if (mounted) {
+        setState(() {
+          _isConnected = true;
+          _status = "Already Connected";
+        });
+      }
+      return;
+    }
+
     try {
       await socket.connect("wss://oiss.onrender.com/ws");
     } catch (e) {
@@ -114,10 +126,17 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
     if (!Platform.isAndroid) return;
     try {
       if (await flutterV2ray.requestPermission()) {
-        final config = FlutterV2ray.parseFromURL('socks://127.0.0.1:1081').getFullConfiguration();
+        final configString = FlutterV2ray.parseFromURL('socks://127.0.0.1:1081').getFullConfiguration();
+        final config = jsonDecode(configString);
+        
+        // Use TCP DNS to bypass the SOCKS proxy UDP limitation
+        config['dns'] = {
+          "servers": ["tcp://8.8.8.8", "tcp://8.8.4.4"]
+        };
+
         await flutterV2ray.startV2Ray(
           remark: "OISS Network",
-          config: config,
+          config: jsonEncode(config),
           proxyOnly: false,
         );
       } else {
@@ -240,15 +259,13 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
                 
                 // Properties List (Mimicking Android Wi-Fi properties)
                 _buildPropertyRow("Technical standards", "OISS TLS Relay (Secure)"),
-                _buildPropertyRow("Signal strength", _isConnected ? "High" : "None"),
-                _buildPropertyRow("Security", widget.password.isEmpty ? "Open" : "OISS-PSK"),
+                _buildPropertyRow("Signal strength", "Excellent"),
+                _buildPropertyRow("Security", "WPA3-Personal"),
                 _buildPropertyRow("Frequency band", "WebSocket Tunnel"),
                 _buildPropertyRow("Transmit link speed", _isConnected ? "${(socket.currentSpeedMBps * 0.8).toStringAsFixed(2)} MB/s" : "-"),
                 _buildPropertyRow("Receive link speed", _isConnected ? "${socket.currentSpeedMBps.toStringAsFixed(2)} MB/s" : "-"),
-                _buildPropertyRow("Gateway", "10.0.0.1 (Virtual)"),
-                _buildPropertyRow("Subnet mask", "255.255.255.0"),
-                _buildPropertyRow("DNS", "8.8.8.8"),
-                _buildPropertyRow("IPv4 address", _isConnected ? "10.0.0.${DateTime.now().millisecond % 200 + 2}" : "-"),
+                _buildPropertyRow("MAC address", _isConnected ? "4A:2B:9C:11:F2:E4" : "-"),
+                _buildPropertyRow("IPv4 address", _isConnected ? _displayIp : "-"),
                 
                 const SizedBox(height: 20),
               ],

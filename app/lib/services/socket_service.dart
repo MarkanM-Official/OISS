@@ -10,6 +10,11 @@ class SocketService extends ChangeNotifier {
   WebSocketChannel? _channel;
   bool _isConnected = false;
   
+  String _deviceType = "unknown";
+  
+  String? _connectedPeer;
+  String? get connectedPeer => _connectedPeer;
+  
   // Speed tracking
   int _bytesReceivedSinceLastTick = 0;
   double _currentSpeedMBps = 0.0;
@@ -31,6 +36,7 @@ class SocketService extends ChangeNotifier {
   // Callbacks
   Function(String receiverId)? onApprovalRequest;
   Function(String? peer)? onConnected;
+  Function()? onDisconnected;
   Function()? onRejected;
   Function()? onDonorDisconnected;
   Function(String payload)? onDataReceived;
@@ -103,12 +109,18 @@ class SocketService extends ChangeNotifier {
         onWaitingApproval?.call();
         break;
       case 'connected':
+        _connectedPeer = msg['peer'];
         onConnected?.call(msg['peer']); 
+        break;
+      case 'disconnected':
+        _connectedPeer = null;
+        onDisconnected?.call();
         break;
       case 'rejected':
         onRejected?.call();
         break;
       case 'donor_disconnected':
+        _connectedPeer = null;
         onDonorDisconnected?.call();
         break;
       case 'data':
@@ -370,6 +382,8 @@ class SocketService extends ChangeNotifier {
 
   void disconnect() {
     _channel?.sink.close();
+    _channel = null;
+    _connectedPeer = null;
     _isConnected = false;
     _stopSpeedTimer();
     stopLocalProxy();

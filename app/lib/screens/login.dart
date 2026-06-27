@@ -181,6 +181,16 @@ class _LoginScreenState extends State<LoginScreen> {
             MaterialPageRoute(builder: (context) => const HomeScreen()),
           );
         }
+      } else if (response.statusCode == 401) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('auth_token');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _tokenController.clear();
+            _status = "Token Expired. Please get a new token via Web.";
+          });
+        }
       } else {
         _showError("Backend Verification Failed: ${response.statusCode}");
       }
