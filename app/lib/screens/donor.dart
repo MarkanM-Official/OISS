@@ -66,7 +66,7 @@ class _DonorScreenState extends State<DonorScreen> {
     if (socketService.isConnected) {
       // Pass all the config to socket service
       socketService.registerAsDonorConfigured({
-        "pairing_code": _pairingCode,
+        "code": _pairingCode,
         "is_public": widget.isPublic,
         "name": widget.serverName,
         "max_users": widget.maxUsers,

@@ -59,7 +59,7 @@ class _WifiListScreenState extends State<WifiListScreen> {
     
     // Auto-prompt connect by pinging server
     try {
-      final response = await http.get(Uri.parse('https://oiss.onrender.com/api/check_server/\$uid'));
+      final response = await http.get(Uri.parse('https://oiss.onrender.com/api/check_server/$uid'));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['exists'] == true) {
