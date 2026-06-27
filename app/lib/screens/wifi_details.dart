@@ -103,7 +103,7 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: Colors.grey, fontSize: 16)),
-          Text(value, style: const TextStyle(fontSize: 16)),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 16)),
         ],
       ),
     );
@@ -115,7 +115,8 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
       backgroundColor: Colors.black, // Dark theme like Android Wi-Fi settings
       appBar: AppBar(
         backgroundColor: Colors.black,
-        title: Text("OISS_${widget.uid}"),
+        title: Text("OISS_${widget.uid}", style: const TextStyle(color: Colors.white)),
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
             icon: const Icon(Icons.open_in_new),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 import 'wifi_details.dart';
 import '../services/socket_service.dart';
 import 'package:provider/provider.dart';
@@ -42,28 +43,53 @@ class _WifiListScreenState extends State<WifiListScreen> {
     await prefs.setString('saved_networks', jsonEncode(_savedNetworks));
   }
 
-  void _addNetworkFromSearch() {
+  Future<void> _addNetworkFromSearch() async {
     final uid = _searchController.text.trim();
     if (uid.isEmpty) return;
-
-    // Check if already exists
-    final index = _savedNetworks.indexWhere((net) => net['uid'] == uid);
-    if (index == -1) {
-      setState(() {
-        _savedNetworks.add({
-          'uid': uid,
-          'name': 'OISS Network ($uid)',
-          'password': '',
-          'last_connected': DateTime.now().toIso8601String(),
-        });
-      });
-      _saveNetworks();
-    }
-    _searchController.clear();
-    FocusScope.of(context).unfocus();
     
-    // Auto-prompt connect
-    _promptConnect(uid, 'OISS Network ($uid)');
+    // Auto-prompt connect by pinging server
+    try {
+      final response = await http.get(Uri.parse('https://oiss.onrender.com/api/check_server/\$uid'));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['exists'] == true) {
+          String networkName = data['name'];
+          final index = _savedNetworks.indexWhere((net) => net['uid'] == uid);
+          if (index == -1) {
+            setState(() {
+              _savedNetworks.add({
+                'uid': uid,
+                'name': networkName,
+                'password': '',
+                'last_connected': DateTime.now().toIso8601String(),
+              });
+            });
+            _saveNetworks();
+          }
+          _searchController.clear();
+          FocusScope.of(context).unfocus();
+          _promptConnect(uid, networkName);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Server not found or currently offline!'), backgroundColor: Colors.red),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Network error connecting to OISS server.'), backgroundColor: Colors.orange),
+        );
+      }
+    }
+  }
+
+  void _scanQR() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('QR Scanner not implemented in this build.')),
+    );
   }
 
   void _promptConnect(String uid, String name) {
@@ -131,14 +157,52 @@ class _WifiListScreenState extends State<WifiListScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Quick Actions Row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1E1E1E),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      icon: const Icon(Icons.qr_code_scanner, color: Colors.blueAccent),
+                      label: const Text("Scan QR"),
+                      onPressed: _scanQR,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1E1E1E),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      icon: const Icon(Icons.keyboard, color: Colors.blueAccent),
+                      label: const Text("Enter Code"),
+                      onPressed: () {
+                         FocusScope.of(context).requestFocus(FocusNode()); // dismiss if open
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
             // Search Bar
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: TextField(
                 controller: _searchController,
+                style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   hintText: 'Search network by UID...',
-                  prefixIcon: const Icon(Icons.search),
+                  hintStyle: const TextStyle(color: Colors.grey),
+                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.add_circle, color: Colors.blueAccent),
                     onPressed: _addNetworkFromSearch,

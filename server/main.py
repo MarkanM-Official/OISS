@@ -375,6 +375,25 @@ def get_public_servers():
     # Temporarily disabled due to security review
     return []
 
+@app.get("/api/generate_uid")
+def generate_uid():
+    import random
+    # Generate a random 9-digit UID
+    uid = str(random.randint(100000000, 999999999))
+    return {"uid": uid}
+
+@app.get("/api/check_server/{uid}")
+def check_server(uid: str):
+    # Check if server is currently online
+    if uid in donors_by_code:
+        limits = donor_limits.get(donors_by_code[uid], {})
+        return {
+            "exists": True, 
+            "name": limits.get("name", f"OISS_{uid}"),
+            "has_password": bool(limits.get("password"))
+        }
+    return {"exists": False}
+
 @app.get("/api/leaderboard")
 def get_leaderboard():
     return database.get_leaderboard()
