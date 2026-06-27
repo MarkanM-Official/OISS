@@ -26,3 +26,4 @@ app/android/key.properties
 Thumbs.db
 dist/
 node_modules/
+.env

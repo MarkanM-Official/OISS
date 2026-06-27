@@ -157,7 +157,7 @@ async def test_sheets(request: Request):
         import os
         
         sheet_json = os.getenv("GOOGLE_SHEET_JSON")
-        sheet_id = "1i8mboKB8eBC20H8MluOok0kM38pxc_AnqF3w-KvxQAc"
+        sheet_id = os.getenv("GOOGLE_SHEET_ID")
         
         if not sheet_json or not sheet_id:
             return HTMLResponse("<h1>Error: Missing Env Variables!</h1><p>GOOGLE_SHEET_JSON or GOOGLE_SHEET_ID is not set on Render.</p>")
@@ -334,7 +334,7 @@ async def verify_flutter_token(req: TokenVerifyRequest, request: Request):
         
         # Log to Google Sheets
         sheet_json = os.getenv("GOOGLE_SHEET_JSON")
-        sheet_id = "1i8mboKB8eBC20H8MluOok0kM38pxc_AnqF3w-KvxQAc"
+        sheet_id = os.getenv("GOOGLE_SHEET_ID")
         if sheet_json and sheet_id:
             try:
                 creds_dict = json.loads(sheet_json)
