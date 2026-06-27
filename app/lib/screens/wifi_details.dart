@@ -153,12 +153,14 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
         final configString = FlutterV2ray.parseFromURL('socks://127.0.0.1:1081').getFullConfiguration();
         final config = jsonDecode(configString);
         
-        // Use TCP DNS to bypass the SOCKS proxy UDP limitation
+        // Android VPN DNS entries must be plain IPs; tcp://... makes
+        // VpnService.Builder.addDnsServer fail inside flutter_v2ray.
         config['dns'] = {
-          "servers": ["tcp://8.8.8.8", "tcp://8.8.4.4"]
+          "servers": ["8.8.8.8", "8.8.4.4"]
         };
 
-        // Bypass routing for WebSocket and loopback to prevent infinite loop
+        // Keep control traffic out of the tunnel and avoid sending UDP into the
+        // OISS SOCKS bridge, which currently supports TCP CONNECT traffic.
         config['routing'] = {
           "domainStrategy": "IPIfNonMatch",
           "rules": [
@@ -174,7 +176,18 @@ class _WifiDetailsScreenState extends State<WifiDetailsScreen> {
             },
             {
               "type": "field",
-              "network": "tcp,udp",
+              "network": "udp",
+              "port": "53",
+              "outboundTag": "direct"
+            },
+            {
+              "type": "field",
+              "network": "udp",
+              "outboundTag": "blackhole"
+            },
+            {
+              "type": "field",
+              "network": "tcp",
               "outboundTag": "proxy"
             }
           ]
