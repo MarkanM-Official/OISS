@@ -31,7 +31,7 @@ class _PublicServersScreenState extends State<PublicServersScreen> {
       _error = "";
     });
     try {
-      final response = await http.get(Uri.parse('http://10.180.191.113:8000/api/servers'));
+      final response = await http.get(Uri.parse('https://oiss.onrender.com/api/servers'));
       if (response.statusCode == 200) {
         setState(() {
           _servers = jsonDecode(response.body);
@@ -53,7 +53,7 @@ class _PublicServersScreenState extends State<PublicServersScreen> {
 
   void _connectToServer(String uid) async {
     final socketService = Provider.of<SocketService>(context, listen: false);
-    await socketService.connect("ws://10.180.191.113:8000/ws");
+    await socketService.connect("wss://oiss.onrender.com/ws");
 
     if (socketService.isConnected) {
       // Actually, joining requires the 6 digit pairing code.

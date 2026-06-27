@@ -55,7 +55,7 @@ class _DonorScreenState extends State<DonorScreen> {
   void _setupSocket() async {
     final socketService = Provider.of<SocketService>(context, listen: false);
     
-    await socketService.connect("ws://10.180.191.113:8000/ws");
+    await socketService.connect("wss://oiss.onrender.com/ws");
     
     if (socketService.isConnected) {
       // Pass all the config to socket service

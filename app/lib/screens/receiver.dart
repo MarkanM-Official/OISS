@@ -20,7 +20,7 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
 
   void _connect(String code) async {
     final socketService = Provider.of<SocketService>(context, listen: false);
-    await socketService.connect("ws://10.180.191.113:8000/ws");
+    await socketService.connect("wss://oiss.onrender.com/ws");
 
     if (socketService.isConnected) {
       socketService.joinAsReceiver(code);
