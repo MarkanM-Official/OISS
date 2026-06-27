@@ -109,13 +109,26 @@ async def admin_dashboard(request: Request):
     if not user:
         return RedirectResponse(url='/admin')
         
-    if user['email'] not in ADMIN_EMAILS:
+    if user['email'] not in ADMIN_EMAILS and not database.is_admin(user['email']):
         return HTMLResponse("<h1>Access Denied</h1><p>You are not an authorized OISS Administrator.</p>", status_code=403)
         
-    # Get stats for dashboard
     active_connections = len(connections)
     total_public_servers = len(database.get_public_servers())
     leaderboard = database.get_leaderboard()
+    admins_list = database.get_all_admins()
+    blocked_list = database.get_all_blocked_users()
+    
+    # Pass active connections to template for direct messaging
+    active_sessions = []
+    for sid, _ in connections.items():
+        name = "Unknown"
+        if sid in donor_limits:
+            name = "Donor Node"
+        elif sid in receiver_state:
+            name = "Receiver Client"
+        elif sid in relay_manager.relays:
+            name = "Relay Server"
+        active_sessions.append({"id": sid, "name": name})
     
     return templates.TemplateResponse(
         request=request,
@@ -124,14 +137,17 @@ async def admin_dashboard(request: Request):
             "user": user,
             "active_connections": active_connections,
             "total_servers": total_public_servers,
-            "leaderboard": leaderboard
+            "leaderboard": leaderboard,
+            "admins": admins_list,
+            "blocked_users": blocked_list,
+            "active_sessions": active_sessions
         }
     )
 
 @app.post("/admin/broadcast")
 async def broadcast_notification(request: Request, message: str = Form(...)):
     user = request.session.get('user')
-    if not user or user['email'] not in ADMIN_EMAILS:
+    if not user or (user['email'] not in ADMIN_EMAILS and not database.is_admin(user['email'])):
         return RedirectResponse(url='/admin')
         
     # Send broadcast to all connected websockets
@@ -147,6 +163,65 @@ async def broadcast_notification(request: Request, message: str = Form(...)):
             pass
             
     return RedirectResponse(url='/admin/dashboard?msg=Broadcast+Sent', status_code=303)
+
+@app.post("/admin/api/add_admin")
+async def add_new_admin(request: Request, email: str = Form(...)):
+    user = request.session.get('user')
+    if not user or (user['email'] not in ADMIN_EMAILS and not database.is_admin(user['email'])):
+        return RedirectResponse(url='/admin')
+    database.add_admin(email.strip(), user['email'])
+    return RedirectResponse(url='/admin/dashboard?msg=Admin+Added', status_code=303)
+
+@app.post("/admin/api/remove_admin")
+async def remove_existing_admin(request: Request, email: str = Form(...)):
+    user = request.session.get('user')
+    if not user or (user['email'] not in ADMIN_EMAILS and not database.is_admin(user['email'])):
+        return RedirectResponse(url='/admin')
+    database.remove_admin(email.strip())
+    return RedirectResponse(url='/admin/dashboard?msg=Admin+Removed', status_code=303)
+
+@app.post("/admin/api/block_user")
+async def block_user(request: Request, identifier: str = Form(...), reason: str = Form("")):
+    user = request.session.get('user')
+    if not user or (user['email'] not in ADMIN_EMAILS and not database.is_admin(user['email'])):
+        return RedirectResponse(url='/admin')
+    database.add_to_blocklist(identifier.strip(), reason.strip())
+    
+    # Disconnect immediately if they are connected
+    ident = identifier.strip()
+    if ident in connections:
+        try:
+            asyncio.create_task(connections[ident].close(code=1008, reason="Blocked by Administrator"))
+        except:
+            pass
+            
+    return RedirectResponse(url='/admin/dashboard?msg=User+Blocked', status_code=303)
+
+@app.post("/admin/api/unblock_user")
+async def unblock_user(request: Request, identifier: str = Form(...)):
+    user = request.session.get('user')
+    if not user or (user['email'] not in ADMIN_EMAILS and not database.is_admin(user['email'])):
+        return RedirectResponse(url='/admin')
+    database.remove_from_blocklist(identifier.strip())
+    return RedirectResponse(url='/admin/dashboard?msg=User+Unblocked', status_code=303)
+
+@app.post("/admin/api/message_user")
+async def message_specific_user(request: Request, session_id: str = Form(...), message: str = Form(...)):
+    user = request.session.get('user')
+    if not user or (user['email'] not in ADMIN_EMAILS and not database.is_admin(user['email'])):
+        return RedirectResponse(url='/admin')
+    
+    sid = session_id.strip()
+    if sid in connections:
+        dm = {
+            "type": "admin_notification",
+            "message": message
+        }
+        try:
+            asyncio.create_task(connections[sid].send_text(json.dumps(dm)))
+        except:
+            pass
+    return RedirectResponse(url='/admin/dashboard?msg=Message+Sent', status_code=303)
 
 # --- App Token Flow (For Desktop/All Platforms) ---
 import jwt

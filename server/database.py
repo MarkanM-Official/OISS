@@ -165,3 +165,33 @@ def add_admin(email, added_by):
     cursor.execute('INSERT OR IGNORE INTO admins (email, added_by) VALUES (?, ?)', (email, added_by))
     conn.commit()
     conn.close()
+
+def get_all_admins():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT email, added_by, added_at FROM admins')
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"email": r[0], "added_by": r[1], "added_at": r[2]} for r in rows]
+
+def remove_admin(email):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM admins WHERE email = ?', (email,))
+    conn.commit()
+    conn.close()
+
+def get_all_blocked_users():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, identifier, reason, blocked_at FROM blocklist')
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r[0], "identifier": r[1], "reason": r[2], "blocked_at": r[3]} for r in rows]
+
+def remove_from_blocklist(identifier):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM blocklist WHERE identifier = ?', (identifier,))
+    conn.commit()
+    conn.close()
