@@ -22,10 +22,11 @@ class OissApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'OISS - Open Internet Sharing System',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-        useMaterial3: true,
-        fontFamily: 'Roboto', // Modern, clean default
+      theme: ThemeData.dark(useMaterial3: true).copyWith(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.green,
+          brightness: Brightness.dark,
+        ),
       ),
       home: const LoginScreen(),
       debugShowCheckedModeBanner: false,

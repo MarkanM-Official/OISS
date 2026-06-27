@@ -250,9 +250,14 @@ class _DonorScreenState extends State<DonorScreen> {
                 ),
                 const SizedBox(height: 16),
                 QrImageView(
-                  data: _pairingCode,
+                  data: jsonEncode({
+                    "uid": _pairingCode,
+                    "pwd": widget.password,
+                    "name": widget.serverName
+                  }),
                   version: QrVersions.auto,
                   size: 200.0,
+                  backgroundColor: Colors.white,
                 ),
                 const SizedBox(height: 16),
                 const Text('OR USE TEXT CODE', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -260,15 +265,17 @@ class _DonorScreenState extends State<DonorScreen> {
                   margin: const EdgeInsets.only(top: 10),
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
                   decoration: BoxDecoration(
-                    color: Colors.grey[200],
+                    color: const Color(0xFF1E1E1E),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
                     _pairingCode,
-                    style: const TextStyle(
-                      fontSize: 48,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: widget.isTemp ? 48 : 24,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 4,
+                      letterSpacing: widget.isTemp ? 4 : 1,
+                      color: Colors.white,
                     ),
                   ),
                 ),

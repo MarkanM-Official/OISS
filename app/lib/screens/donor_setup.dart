@@ -16,6 +16,7 @@ class _DonorSetupScreenState extends State<DonorSetupScreen> {
   double _maxUsers = 5;
   String _permanentUid = "";
   String _password = "";
+  String _serverDuration = "All-Time";
 
   @override
   void initState() {
@@ -65,7 +66,21 @@ class _DonorSetupScreenState extends State<DonorSetupScreen> {
                 "Security: ${_password.isEmpty ? 'Open' : 'WPA/WPA2 PSK'}",
                 style: const TextStyle(fontSize: 16, color: Colors.grey),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 16),
+              DropdownButton<String>(
+                value: _serverDuration,
+                dropdownColor: const Color(0xFF1E1E1E),
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+                items: const [
+                  DropdownMenuItem(value: "All-Time", child: Text("All-Time (Permanent)")),
+                  DropdownMenuItem(value: "24-Hours", child: Text("24-Hours (One-time)")),
+                  DropdownMenuItem(value: "1-Hour", child: Text("1-Hour")),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _serverDuration = val);
+                },
+              ),
+              const SizedBox(height: 32),
               SizedBox(
                 width: 200,
                 height: 200,
@@ -83,7 +98,7 @@ class _DonorSetupScreenState extends State<DonorSetupScreen> {
                       );
                       return;
                     }
-                    Navigator.pushReplacement(
+                    Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => DonorScreen(
@@ -92,7 +107,7 @@ class _DonorSetupScreenState extends State<DonorSetupScreen> {
                           maxUsers: _maxUsers.round(),
                           dataLimitMB: _dataLimitMB,
                           password: _password,
-                          isTemp: false,
+                          isTemp: _serverDuration != "All-Time",
                           uid: _permanentUid,
                         ),
                       ),
